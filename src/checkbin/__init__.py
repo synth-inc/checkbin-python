@@ -54,6 +54,7 @@ class CheckbinRunner:
         self.gcp_service_account_info = gcp_service_account_info
         self.gcp_service_account_json = gcp_service_account_json
         self.checkins = []
+        self.is_running = False
 
     def checkpoint(
         self,
@@ -68,6 +69,15 @@ class CheckbinRunner:
                 "files": None,
             }
         )
+
+        if not self.is_running:
+            requests.patch(
+                f"https://checkbin-server-prod-d332d31d3c50.herokuapp.com/run/{self.run_id}/job",
+                headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+                json={"jobs": [{"checkinId": self.parent_id, "status": "running"}]},
+                timeout=30,
+            )
+            self.is_running = True
 
     def add_state(self, key: str, state: Any):
         if self.checkins[-1]["state"] is None:
@@ -298,6 +308,13 @@ class CheckbinRunner:
             timeout=30,
         )
 
+        requests.patch(
+            f"https://checkbin-server-prod-d332d31d3c50.herokuapp.com/run/{self.run_id}/job",
+            headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            json={"jobs": [{"checkinId": self.parent_id, "status": "completed"}]},
+            timeout=30,
+        )
+
 
 class CheckbinApp:
     def __init__(self, app_key: str):
@@ -361,6 +378,15 @@ class CheckbinApp:
                 checkins = random.sample(checkins, min(sample_size, len(checkins)))
         else:
             raise Exception("Either checkin_id or set_id must be provided")
+
+        requests.patch(
+            f"https://checkbin-server-prod-d332d31d3c50.herokuapp.com/run/{run_id}/job",
+            headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            json={"jobs": [{"checkinId": checkin["id"]} for checkin in checkins]},
+            timeout=30,
+        )
+
+        print(f"Checkbin: started run {run_id} with {len(checkins)} jobs")
 
         runners = []
         for checkin in checkins:
