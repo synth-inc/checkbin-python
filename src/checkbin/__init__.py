@@ -65,6 +65,7 @@ class CheckbinRunner:
             {
                 "name": name,
                 "ids": ids,
+                "keys": set(),
                 "state": None,
                 "files": None,
             }
@@ -79,10 +80,23 @@ class CheckbinRunner:
             )
             self.is_running = True
 
+    def _get_key(self, key: str) -> str:
+        if key not in self.checkins[-1]["keys"]:
+            return key
+
+        level = 1
+        new_key = key
+        while new_key in self.checkins[-1]["keys"]:
+            new_key = f"{key}_{level}"
+            level += 1
+        return new_key
+
     def add_state(self, key: str, state: Any):
         if self.checkins[-1]["state"] is None:
             self.checkins[-1]["state"] = {}
+        key = self._get_key(key)
         self.checkins[-1]["state"][key] = state
+        self.checkins[-1]["keys"].add(key)
 
     def add_file(
         self,
@@ -93,11 +107,13 @@ class CheckbinRunner:
     ):
         if self.checkins[-1]["files"] is None:
             self.checkins[-1]["files"] = {}
+        key = self._get_key(key)
         self.checkins[-1]["files"][key] = {
             "url": url,
             "mediaType": media_type,
             "pickle": pickle,
         }
+        self.checkins[-1]["keys"].add(key)
 
     def check_credentials_azure(self):
         if self.azure_account_name is None:
