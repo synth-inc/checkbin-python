@@ -115,11 +115,23 @@ class CheckbinRunner:
         }
         self.checkins[-1]["keys"].add(key)
 
-    def __check_credentials_azure(self):
-        if self.azure_account_name is None:
-            raise Exception("Azure account name is required")
-        if self.azure_account_key is None:
-            raise Exception("Azure account key is required")
+    def __check_credentials(self, storage_service: Literal["azure", "aws", "gcp"]):
+        if storage_service == "azure":
+            if self.azure_account_name is None:
+                raise Exception("Azure account name is required")
+            if self.azure_account_key is None:
+                raise Exception("Azure account key is required")
+        elif storage_service == "aws":
+            if self.aws_access_key is None:
+                raise Exception("AWS access key is required")
+            if self.aws_secret_key is None:
+                raise Exception("AWS secret key is required")
+        elif storage_service == "gcp":
+            if (
+                self.gcp_service_account_info is None
+                and self.gcp_service_account_json is None
+            ):
+                raise Exception("GCP service account info or json is required")
 
     def __upload_file_azure(self, container: str, extension: str, file: bytes):
         blob_service_client = BlobServiceClient(
@@ -132,12 +144,6 @@ class CheckbinRunner:
         blob_client.upload_blob(file)
         return blob_client.url
 
-    def __check_credentials_aws(self):
-        if self.aws_access_key is None:
-            raise Exception("AWS access key is required")
-        if self.aws_secret_key is None:
-            raise Exception("AWS secret key is required")
-
     def __upload_file_aws(self, bucket: str, extension: str, file: bytes):
         s3_client = boto3.client(
             "s3",
@@ -147,13 +153,6 @@ class CheckbinRunner:
         filename = f"{uuid.uuid4().hex}{extension}"
         s3_client.upload_fileobj(file, bucket, filename)
         return f"https://{bucket}.s3.amazonaws.com/{filename}"
-
-    def __check_credentials_gcp(self):
-        if (
-            self.gcp_service_account_info is None
-            and self.gcp_service_account_json is None
-        ):
-            raise Exception("GCP service account info or json is required")
 
     def __upload_file_gcp(self, bucket: str, extension: str, file: bytes):
         if self.gcp_service_account_info is not None:
@@ -179,12 +178,7 @@ class CheckbinRunner:
         media_type: Optional[MediaType] = None,
         pickle: bool = False,
     ):
-        if storage_service == "azure":
-            self.__check_credentials_azure()
-        elif storage_service == "aws":
-            self.__check_credentials_aws()
-        elif storage_service == "gcp":
-            self.__check_credentials_gcp()
+        self.__check_credentials(storage_service)
 
         with open(file_path, "rb") as file:
             start_time = time.time()
@@ -208,12 +202,7 @@ class CheckbinRunner:
         key: str,
         variable: Any,
     ):
-        if storage_service == "azure":
-            self.__check_credentials_azure()
-        elif storage_service == "aws":
-            self.__check_credentials_aws()
-        elif storage_service == "gcp":
-            self.__check_credentials_gcp()
+        self.__check_credentials(storage_service)
 
         with tempfile.NamedTemporaryFile(suffix=".pkl") as tmp_file:
             pickle.dump(variable, tmp_file)
@@ -268,12 +257,7 @@ class CheckbinRunner:
             ]
         ] = None,
     ):
-        if storage_service == "azure":
-            self.__check_credentials_azure()
-        elif storage_service == "aws":
-            self.__check_credentials_aws()
-        elif storage_service == "gcp":
-            self.__check_credentials_gcp()
+        self.__check_credentials(storage_service)
 
         if isinstance(array, torch.Tensor):
             array = array.detach().cpu().numpy()
