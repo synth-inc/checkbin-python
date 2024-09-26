@@ -233,7 +233,7 @@ class CheckbinRunner:
             pickle.dump(variable, tmp_file)
             self.upload_file_gcp(bucket, key, tmp_file.name, pickle=True)
 
-    def colorspace_to_conversion(self, colorspace: str) -> Optional[int]:
+    def __colorspace_to_conversion(self, colorspace: str) -> Optional[int]:
         if colorspace == "BGRA":
             return cv2.COLOR_BGRA2BGR
         elif colorspace == "RGBA":
@@ -295,9 +295,9 @@ class CheckbinRunner:
 
         if (
             colorspace is not None
-            and self.colorspace_to_conversion(colorspace) is not None
+            and self.__colorspace_to_conversion(colorspace) is not None
         ):
-            array = cv2.cvtColor(array, self.colorspace_to_conversion(colorspace))
+            array = cv2.cvtColor(array, self.__colorspace_to_conversion(colorspace))
 
         with tempfile.NamedTemporaryFile(suffix=".jpg") as tmp_file:
             cv2.imwrite(tmp_file.name, array)
