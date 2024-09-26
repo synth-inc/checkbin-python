@@ -80,7 +80,7 @@ class CheckbinRunner:
             )
             self.is_running = True
 
-    def _get_key(self, key: str) -> str:
+    def __get_key(self, key: str) -> str:
         if key not in self.checkins[-1]["keys"]:
             return key
 
@@ -94,7 +94,7 @@ class CheckbinRunner:
     def add_state(self, key: str, state: Any):
         if self.checkins[-1]["state"] is None:
             self.checkins[-1]["state"] = {}
-        key = self._get_key(key)
+        key = self.__get_key(key)
         self.checkins[-1]["state"][key] = state
         self.checkins[-1]["keys"].add(key)
 
@@ -107,7 +107,7 @@ class CheckbinRunner:
     ):
         if self.checkins[-1]["files"] is None:
             self.checkins[-1]["files"] = {}
-        key = self._get_key(key)
+        key = self.__get_key(key)
         self.checkins[-1]["files"][key] = {
             "url": url,
             "mediaType": media_type,
@@ -115,7 +115,7 @@ class CheckbinRunner:
         }
         self.checkins[-1]["keys"].add(key)
 
-    def check_credentials_azure(self):
+    def __check_credentials_azure(self):
         if self.azure_account_name is None:
             raise Exception("Azure account name is required")
         if self.azure_account_key is None:
@@ -129,7 +129,7 @@ class CheckbinRunner:
         media_type: Optional[MediaType] = None,
         pickle: bool = False,
     ):
-        self.check_credentials_azure()
+        self.__check_credentials_azure()
         blob_service_client = BlobServiceClient(
             account_url=f"https://{self.azure_account_name}.blob.core.windows.net",
             credential=self.azure_account_key,
@@ -148,12 +148,12 @@ class CheckbinRunner:
         self.add_file(key, url, media_type, pickle)
 
     def upload_pickle_azure(self, container_name: str, key: str, variable: Any):
-        self.check_credentials_azure()
+        self.__check_credentials_azure()
         with tempfile.NamedTemporaryFile(suffix=".pkl") as tmp_file:
             pickle.dump(variable, tmp_file)
             self.upload_file_azure(container_name, key, tmp_file.name, pickle=True)
 
-    def check_credentials_aws(self):
+    def __check_credentials_aws(self):
         if self.aws_access_key is None:
             raise Exception("AWS access key is required")
         if self.aws_secret_key is None:
@@ -167,7 +167,7 @@ class CheckbinRunner:
         media_type: Optional[MediaType] = None,
         pickle: bool = False,
     ):
-        self.check_credentials_aws()
+        self.__check_credentials_aws()
         s3_client = boto3.client(
             "s3",
             aws_access_key_id=self.aws_access_key,
@@ -185,12 +185,12 @@ class CheckbinRunner:
         self.add_file(key, url, media_type, pickle)
 
     def upload_pickle_aws(self, bucket: str, key: str, variable: Any):
-        self.check_credentials_aws()
+        self.__check_credentials_aws()
         with tempfile.NamedTemporaryFile(suffix=".pkl") as tmp_file:
             pickle.dump(variable, tmp_file)
             self.upload_file_aws(bucket, key, tmp_file.name, pickle=True)
 
-    def check_credentials_gcp(self):
+    def __check_credentials_gcp(self):
         if (
             self.gcp_service_account_info is None
             and self.gcp_service_account_json is None
@@ -205,7 +205,7 @@ class CheckbinRunner:
         media_type: Optional[MediaType] = None,
         pickle: bool = False,
     ):
-        self.check_credentials_gcp()
+        self.__check_credentials_gcp()
         if self.gcp_service_account_info is not None:
             storage_client = storage.Client.from_service_account_info(
                 self.gcp_service_account_info
@@ -228,7 +228,7 @@ class CheckbinRunner:
         self.add_file(key, url, media_type, pickle)
 
     def upload_pickle_gcp(self, bucket: str, key: str, variable: Any):
-        self.check_credentials_gcp()
+        self.__check_credentials_gcp()
         with tempfile.NamedTemporaryFile(suffix=".pkl") as tmp_file:
             pickle.dump(variable, tmp_file)
             self.upload_file_gcp(bucket, key, tmp_file.name, pickle=True)
@@ -281,11 +281,11 @@ class CheckbinRunner:
         ] = None,
     ):
         if storage_service == "azure":
-            self.check_credentials_azure()
+            self.__check_credentials_azure()
         elif storage_service == "aws":
-            self.check_credentials_aws()
+            self.__check_credentials_aws()
         elif storage_service == "gcp":
-            self.check_credentials_gcp()
+            self.__check_credentials_gcp()
 
         if isinstance(array, torch.Tensor):
             array = array.detach().cpu().numpy()
