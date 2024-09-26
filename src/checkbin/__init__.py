@@ -121,15 +121,7 @@ class CheckbinRunner:
         if self.azure_account_key is None:
             raise Exception("Azure account key is required")
 
-    def upload_file_azure(
-        self,
-        container: str,
-        key: str,
-        file_path: str,
-        media_type: Optional[MediaType] = None,
-        pickle: bool = False,
-    ):
-        self.__check_credentials_azure()
+    def __upload_file_azure(self, container: str, file_path: str, file: bytes):
         blob_service_client = BlobServiceClient(
             account_url=f"https://{self.azure_account_name}.blob.core.windows.net",
             credential=self.azure_account_key,
@@ -138,20 +130,8 @@ class CheckbinRunner:
         _, extension = os.path.splitext(os.path.basename(file_path))
         filename = f"{uuid.uuid4().hex}{extension}"
         blob_client = container_client.get_blob_client(filename)
-        with open(file_path, "rb") as file:
-            start_time = time.time()
-            print(f"Checkbin: recording file")
-            blob_client.upload_blob(file)
-            print(f"Checkbin: recording file upload time: {time.time() - start_time}")
-            print(f"Checkbin: recorded file: {blob_client.url}")
-            url = blob_client.url
-        self.add_file(key, url, media_type, pickle)
-
-    def upload_pickle_azure(self, container_name: str, key: str, variable: Any):
-        self.__check_credentials_azure()
-        with tempfile.NamedTemporaryFile(suffix=".pkl") as tmp_file:
-            pickle.dump(variable, tmp_file)
-            self.upload_file_azure(container_name, key, tmp_file.name, pickle=True)
+        blob_client.upload_blob(file)
+        return blob_client.url
 
     def __check_credentials_aws(self):
         if self.aws_access_key is None:
@@ -159,15 +139,7 @@ class CheckbinRunner:
         if self.aws_secret_key is None:
             raise Exception("AWS secret key is required")
 
-    def upload_file_aws(
-        self,
-        bucket: str,
-        key: str,
-        file_path: str,
-        media_type: Optional[MediaType] = None,
-        pickle: bool = False,
-    ):
-        self.__check_credentials_aws()
+    def __upload_file_aws(self, bucket: str, file_path: str, file: bytes):
         s3_client = boto3.client(
             "s3",
             aws_access_key_id=self.aws_access_key,
@@ -175,20 +147,8 @@ class CheckbinRunner:
         )
         _, extension = os.path.splitext(os.path.basename(file_path))
         filename = f"{uuid.uuid4().hex}{extension}"
-        with open(file_path, "rb") as file:
-            start_time = time.time()
-            print(f"Checkbin: recording file")
-            s3_client.upload_fileobj(file, bucket, filename)
-            print(f"Checkbin: recording file upload time: {time.time() - start_time}")
-            url = f"https://{bucket}.s3.amazonaws.com/{filename}"
-            print(f"Checkbin: recorded file: {url}")
-        self.add_file(key, url, media_type, pickle)
-
-    def upload_pickle_aws(self, bucket: str, key: str, variable: Any):
-        self.__check_credentials_aws()
-        with tempfile.NamedTemporaryFile(suffix=".pkl") as tmp_file:
-            pickle.dump(variable, tmp_file)
-            self.upload_file_aws(bucket, key, tmp_file.name, pickle=True)
+        s3_client.upload_fileobj(file, bucket, filename)
+        return f"https://{bucket}.s3.amazonaws.com/{filename}"
 
     def __check_credentials_gcp(self):
         if (
@@ -197,15 +157,7 @@ class CheckbinRunner:
         ):
             raise Exception("GCP service account info or json is required")
 
-    def upload_file_gcp(
-        self,
-        bucket: str,
-        key: str,
-        file_path: str,
-        media_type: Optional[MediaType] = None,
-        pickle: bool = False,
-    ):
-        self.__check_credentials_gcp()
+    def __upload_file_gcp(self, bucket: str, file_path: str, file: bytes):
         if self.gcp_service_account_info is not None:
             storage_client = storage.Client.from_service_account_info(
                 self.gcp_service_account_info
@@ -218,20 +170,58 @@ class CheckbinRunner:
         _, extension = os.path.splitext(os.path.basename(file_path))
         filename = f"{uuid.uuid4().hex}{extension}"
         blob_client = bucket_client.blob(filename)
+        blob_client.upload_from_file(file)
+        return f"https://storage.googleapis.com/{bucket}/{filename}"
+
+    def upload_file(
+        self,
+        container: str,
+        storage_service: Literal["azure", "aws", "gcp"],
+        key: str,
+        file_path: str,
+        media_type: Optional[MediaType] = None,
+        pickle: bool = False,
+    ):
+        if storage_service == "azure":
+            self.__check_credentials_azure()
+        elif storage_service == "aws":
+            self.__check_credentials_aws()
+        elif storage_service == "gcp":
+            self.__check_credentials_gcp()
+
         with open(file_path, "rb") as file:
             start_time = time.time()
             print(f"Checkbin: recording file")
-            blob_client.upload_from_file(file)
+            if storage_service == "azure":
+                url = self.__upload_file_azure(container, file_path, file)
+            elif storage_service == "aws":
+                url = self.__upload_file_aws(container, file_path, file)
+            elif storage_service == "gcp":
+                url = self.__upload_file_gcp(container, file_path, file)
             print(f"Checkbin: recording file upload time: {time.time() - start_time}")
-            url = f"https://storage.googleapis.com/{bucket}/{filename}"
             print(f"Checkbin: recorded file: {url}")
+
         self.add_file(key, url, media_type, pickle)
 
-    def upload_pickle_gcp(self, bucket: str, key: str, variable: Any):
-        self.__check_credentials_gcp()
+    def upload_pickle(
+        self,
+        container: str,
+        storage_service: Literal["azure", "aws", "gcp"],
+        key: str,
+        variable: Any,
+    ):
+        if storage_service == "azure":
+            self.__check_credentials_azure()
+        elif storage_service == "aws":
+            self.__check_credentials_aws()
+        elif storage_service == "gcp":
+            self.__check_credentials_gcp()
+
         with tempfile.NamedTemporaryFile(suffix=".pkl") as tmp_file:
             pickle.dump(variable, tmp_file)
-            self.upload_file_gcp(bucket, key, tmp_file.name, pickle=True)
+            self.upload_file(
+                container, storage_service, key, tmp_file.name, pickle=True
+            )
 
     def __colorspace_to_conversion(self, colorspace: str) -> Optional[int]:
         if colorspace == "BGRA":
@@ -301,12 +291,7 @@ class CheckbinRunner:
 
         with tempfile.NamedTemporaryFile(suffix=".jpg") as tmp_file:
             cv2.imwrite(tmp_file.name, array)
-            if storage_service == "azure":
-                self.upload_file_azure(container, key, tmp_file.name, "image")
-            elif storage_service == "aws":
-                self.upload_file_aws(container, key, tmp_file.name, "image")
-            elif storage_service == "gcp":
-                self.upload_file_gcp(container, key, tmp_file.name, "image")
+            self.upload_file(container, storage_service, key, tmp_file.name, "image")
 
     def submit_test(self):
         self.checkpoint("Output")
