@@ -121,13 +121,12 @@ class CheckbinRunner:
         if self.azure_account_key is None:
             raise Exception("Azure account key is required")
 
-    def __upload_file_azure(self, container: str, file_path: str, file: bytes):
+    def __upload_file_azure(self, container: str, extension: str, file: bytes):
         blob_service_client = BlobServiceClient(
             account_url=f"https://{self.azure_account_name}.blob.core.windows.net",
             credential=self.azure_account_key,
         )
         container_client = blob_service_client.get_container_client(container)
-        _, extension = os.path.splitext(os.path.basename(file_path))
         filename = f"{uuid.uuid4().hex}{extension}"
         blob_client = container_client.get_blob_client(filename)
         blob_client.upload_blob(file)
@@ -139,13 +138,12 @@ class CheckbinRunner:
         if self.aws_secret_key is None:
             raise Exception("AWS secret key is required")
 
-    def __upload_file_aws(self, bucket: str, file_path: str, file: bytes):
+    def __upload_file_aws(self, bucket: str, extension: str, file: bytes):
         s3_client = boto3.client(
             "s3",
             aws_access_key_id=self.aws_access_key,
             aws_secret_access_key=self.aws_secret_key,
         )
-        _, extension = os.path.splitext(os.path.basename(file_path))
         filename = f"{uuid.uuid4().hex}{extension}"
         s3_client.upload_fileobj(file, bucket, filename)
         return f"https://{bucket}.s3.amazonaws.com/{filename}"
@@ -157,7 +155,7 @@ class CheckbinRunner:
         ):
             raise Exception("GCP service account info or json is required")
 
-    def __upload_file_gcp(self, bucket: str, file_path: str, file: bytes):
+    def __upload_file_gcp(self, bucket: str, extension: str, file: bytes):
         if self.gcp_service_account_info is not None:
             storage_client = storage.Client.from_service_account_info(
                 self.gcp_service_account_info
@@ -167,7 +165,6 @@ class CheckbinRunner:
                 self.gcp_service_account_json
             )
         bucket_client = storage_client.get_bucket(bucket)
-        _, extension = os.path.splitext(os.path.basename(file_path))
         filename = f"{uuid.uuid4().hex}{extension}"
         blob_client = bucket_client.blob(filename)
         blob_client.upload_from_file(file)
@@ -192,12 +189,13 @@ class CheckbinRunner:
         with open(file_path, "rb") as file:
             start_time = time.time()
             print(f"Checkbin: recording file")
+            _, extension = os.path.splitext(os.path.basename(file_path))
             if storage_service == "azure":
-                url = self.__upload_file_azure(container, file_path, file)
+                url = self.__upload_file_azure(container, extension, file)
             elif storage_service == "aws":
-                url = self.__upload_file_aws(container, file_path, file)
+                url = self.__upload_file_aws(container, extension, file)
             elif storage_service == "gcp":
-                url = self.__upload_file_gcp(container, file_path, file)
+                url = self.__upload_file_gcp(container, extension, file)
             print(f"Checkbin: recording file upload time: {time.time() - start_time}")
             print(f"Checkbin: recorded file: {url}")
 
