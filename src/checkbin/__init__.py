@@ -31,28 +31,96 @@ def authenticate(token: str):
     AUTH_TOKEN = token
 
 
+class CheckbinFileUploader:
+    def __init__(self):
+        self.azure_account_name = None
+        self.azure_account_key = None
+        self.aws_access_key = None
+        self.aws_secret_key = None
+        self.gcp_service_account_info = None
+        self.gcp_service_account_json = None
+
+    def add_azure_credentials(self, account_name: str, account_key: str):
+        self.azure_account_name = account_name
+        self.azure_account_key = account_key
+
+    def add_aws_credentials(self, access_key: str, secret_key: str):
+        self.aws_access_key = access_key
+        self.aws_secret_key = secret_key
+
+    def add_gcp_credentials_info(self, service_account_info: dict):
+        self.gcp_service_account_info = service_account_info
+
+    def add_gcp_credentials_json(self, service_account_json: str):
+        self.gcp_service_account_json = service_account_json
+
+    def check_credentials(self, storage_service: Literal["azure", "aws", "gcp"]):
+        if storage_service == "azure":
+            if self.azure_account_name is None:
+                raise Exception("Azure account name is required")
+            if self.azure_account_key is None:
+                raise Exception("Azure account key is required")
+        elif storage_service == "aws":
+            if self.aws_access_key is None:
+                raise Exception("AWS access key is required")
+            if self.aws_secret_key is None:
+                raise Exception("AWS secret key is required")
+        elif storage_service == "gcp":
+            if (
+                self.gcp_service_account_info is None
+                and self.gcp_service_account_json is None
+            ):
+                raise Exception("GCP service account info or json is required")
+
+    def upload_file_azure(self, container: str, extension: str, file: bytes):
+        blob_service_client = BlobServiceClient(
+            account_url=f"https://{self.azure_account_name}.blob.core.windows.net",
+            credential=self.azure_account_key,
+        )
+        container_client = blob_service_client.get_container_client(container)
+        filename = f"{uuid.uuid4().hex}{extension}"
+        blob_client = container_client.get_blob_client(filename)
+        blob_client.upload_blob(file)
+        return blob_client.url
+
+    def upload_file_aws(self, bucket: str, extension: str, file: bytes):
+        s3_client = boto3.client(
+            "s3",
+            aws_access_key_id=self.aws_access_key,
+            aws_secret_access_key=self.aws_secret_key,
+        )
+        filename = f"{uuid.uuid4().hex}{extension}"
+        s3_client.upload_fileobj(file, bucket, filename)
+        return f"https://{bucket}.s3.amazonaws.com/{filename}"
+
+    def upload_file_gcp(self, bucket: str, extension: str, file: bytes):
+        if self.gcp_service_account_info is not None:
+            storage_client = storage.Client.from_service_account_info(
+                self.gcp_service_account_info
+            )
+        else:
+            storage_client = storage.Client.from_service_account_json(
+                self.gcp_service_account_json
+            )
+        bucket_client = storage_client.get_bucket(bucket)
+        filename = f"{uuid.uuid4().hex}{extension}"
+        blob_client = bucket_client.blob(filename)
+        blob_client.upload_from_file(file)
+        return f"https://storage.googleapis.com/{bucket}/{filename}"
+
+
 class CheckbinRunner:
     def __init__(
         self,
         run_id: str,
         parent_id: str,
+        file_uploader: CheckbinFileUploader,
         input_state: Optional[Any] = None,
-        azure_account_name: Optional[str] = None,
-        azure_account_key: Optional[str] = None,
-        aws_access_key: Optional[str] = None,
-        aws_secret_key: Optional[str] = None,
-        gcp_service_account_info: Optional[dict] = None,
-        gcp_service_account_json: Optional[str] = None,
     ):
         self.run_id = run_id
         self.parent_id = parent_id
+        self.file_uploader = file_uploader
         self.input_state = input_state
-        self.azure_account_name = azure_account_name
-        self.azure_account_key = azure_account_key
-        self.aws_access_key = aws_access_key
-        self.aws_secret_key = aws_secret_key
-        self.gcp_service_account_info = gcp_service_account_info
-        self.gcp_service_account_json = gcp_service_account_json
         self.checkins = []
         self.is_running = False
 
@@ -115,60 +183,6 @@ class CheckbinRunner:
         }
         self.checkins[-1]["keys"].add(key)
 
-    def __check_credentials(self, storage_service: Literal["azure", "aws", "gcp"]):
-        if storage_service == "azure":
-            if self.azure_account_name is None:
-                raise Exception("Azure account name is required")
-            if self.azure_account_key is None:
-                raise Exception("Azure account key is required")
-        elif storage_service == "aws":
-            if self.aws_access_key is None:
-                raise Exception("AWS access key is required")
-            if self.aws_secret_key is None:
-                raise Exception("AWS secret key is required")
-        elif storage_service == "gcp":
-            if (
-                self.gcp_service_account_info is None
-                and self.gcp_service_account_json is None
-            ):
-                raise Exception("GCP service account info or json is required")
-
-    def __upload_file_azure(self, container: str, extension: str, file: bytes):
-        blob_service_client = BlobServiceClient(
-            account_url=f"https://{self.azure_account_name}.blob.core.windows.net",
-            credential=self.azure_account_key,
-        )
-        container_client = blob_service_client.get_container_client(container)
-        filename = f"{uuid.uuid4().hex}{extension}"
-        blob_client = container_client.get_blob_client(filename)
-        blob_client.upload_blob(file)
-        return blob_client.url
-
-    def __upload_file_aws(self, bucket: str, extension: str, file: bytes):
-        s3_client = boto3.client(
-            "s3",
-            aws_access_key_id=self.aws_access_key,
-            aws_secret_access_key=self.aws_secret_key,
-        )
-        filename = f"{uuid.uuid4().hex}{extension}"
-        s3_client.upload_fileobj(file, bucket, filename)
-        return f"https://{bucket}.s3.amazonaws.com/{filename}"
-
-    def __upload_file_gcp(self, bucket: str, extension: str, file: bytes):
-        if self.gcp_service_account_info is not None:
-            storage_client = storage.Client.from_service_account_info(
-                self.gcp_service_account_info
-            )
-        else:
-            storage_client = storage.Client.from_service_account_json(
-                self.gcp_service_account_json
-            )
-        bucket_client = storage_client.get_bucket(bucket)
-        filename = f"{uuid.uuid4().hex}{extension}"
-        blob_client = bucket_client.blob(filename)
-        blob_client.upload_from_file(file)
-        return f"https://storage.googleapis.com/{bucket}/{filename}"
-
     def upload_file(
         self,
         container: str,
@@ -178,18 +192,18 @@ class CheckbinRunner:
         media_type: Optional[MediaType] = None,
         pickle: bool = False,
     ):
-        self.__check_credentials(storage_service)
+        self.file_uploader.check_credentials(storage_service)
 
         with open(file_path, "rb") as file:
             start_time = time.time()
             print(f"Checkbin: recording file")
             _, extension = os.path.splitext(os.path.basename(file_path))
             if storage_service == "azure":
-                url = self.__upload_file_azure(container, extension, file)
+                url = self.file_uploader.upload_file_azure(container, extension, file)
             elif storage_service == "aws":
-                url = self.__upload_file_aws(container, extension, file)
+                url = self.file_uploader.upload_file_aws(container, extension, file)
             elif storage_service == "gcp":
-                url = self.__upload_file_gcp(container, extension, file)
+                url = self.file_uploader.upload_file_gcp(container, extension, file)
             print(f"Checkbin: recording file upload time: {time.time() - start_time}")
             print(f"Checkbin: recorded file: {url}")
 
@@ -202,7 +216,7 @@ class CheckbinRunner:
         key: str,
         variable: Any,
     ):
-        self.__check_credentials(storage_service)
+        self.file_uploader.check_credentials(storage_service)
 
         with tempfile.NamedTemporaryFile(suffix=".pkl") as tmp_file:
             pickle.dump(variable, tmp_file)
@@ -257,7 +271,7 @@ class CheckbinRunner:
             ]
         ] = None,
     ):
-        self.__check_credentials(storage_service)
+        self.file_uploader.check_credentials(storage_service)
 
         if isinstance(array, torch.Tensor):
             array = array.detach().cpu().numpy()
@@ -302,26 +316,19 @@ class CheckbinRunner:
 class CheckbinApp:
     def __init__(self, app_key: str):
         self.app_key = app_key
-        self.azure_account_name = None
-        self.azure_account_key = None
-        self.aws_access_key = None
-        self.aws_secret_key = None
-        self.gcp_service_account_info = None
-        self.gcp_service_account_json = None
+        self.file_uploader = CheckbinFileUploader()
 
     def add_azure_credentials(self, account_name: str, account_key: str):
-        self.azure_account_name = account_name
-        self.azure_account_key = account_key
+        self.file_uploader.add_azure_credentials(account_name, account_key)
 
     def add_aws_credentials(self, access_key: str, secret_key: str):
-        self.aws_access_key = access_key
-        self.aws_secret_key = secret_key
+        self.file_uploader.add_aws_credentials(access_key, secret_key)
 
     def add_gcp_credentials_info(self, service_account_info: dict):
-        self.gcp_service_account_info = service_account_info
+        self.file_uploader.add_gcp_credentials_info(service_account_info)
 
     def add_gcp_credentials_json(self, service_account_json: str):
-        self.gcp_service_account_json = service_account_json
+        self.file_uploader.add_gcp_credentials_json(service_account_json)
 
     def start_run(
         self,
@@ -376,13 +383,8 @@ class CheckbinApp:
             runner = CheckbinRunner(
                 run_id=run_id,
                 parent_id=checkin["id"],
+                file_uploader=self.file_uploader,
                 input_state={state["name"]: state for state in checkin["state"]},
-                azure_account_name=self.azure_account_name,
-                azure_account_key=self.azure_account_key,
-                aws_access_key=self.aws_access_key,
-                aws_secret_key=self.aws_secret_key,
-                gcp_service_account_info=self.gcp_service_account_info,
-                gcp_service_account_json=self.gcp_service_account_json,
             )
             runners.append(runner)
         return runners
