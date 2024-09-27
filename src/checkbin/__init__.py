@@ -109,62 +109,45 @@ class CheckbinFileUploader:
         return f"https://storage.googleapis.com/{bucket}/{filename}"
 
 
-class CheckbinRunner:
+class CheckbinCheckin:
     def __init__(
         self,
-        run_id: str,
-        parent_id: str,
         file_uploader: CheckbinFileUploader,
-        input_state: Optional[Any] = None,
-    ):
-        self.run_id = run_id
-        self.parent_id = parent_id
-        self.file_uploader = file_uploader
-        self.input_state = input_state
-        self.checkins = []
-        self.is_running = False
-
-    def checkpoint(
-        self,
         name: str,
         ids: Optional[dict[str, str | int | float]] = None,
     ):
-        self.checkins.append(
-            {
-                "name": name,
-                "ids": ids,
-                "keys": set(),
-                "state": None,
-                "files": None,
-            }
-        )
+        self.file_uploader = file_uploader
+        self.name = name
+        self.ids = ids
+        self.keys = set()
+        self.state = None
+        self.files = None
 
-        if not self.is_running:
-            requests.patch(
-                f"https://checkbin-server-prod-d332d31d3c50.herokuapp.com/run/{self.run_id}/job",
-                headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
-                json={"jobs": [{"checkinId": self.parent_id, "status": "running"}]},
-                timeout=30,
-            )
-            self.is_running = True
+    def get_state(self):
+        return {
+            "name": self.name,
+            "ids": self.ids,
+            "state": self.state,
+            "files": self.files,
+        }
 
     def __get_key(self, key: str) -> str:
-        if key not in self.checkins[-1]["keys"]:
+        if key not in self.keys:
             return key
 
         level = 1
         new_key = key
-        while new_key in self.checkins[-1]["keys"]:
+        while new_key in self.keys:
             new_key = f"{key}_{level}"
             level += 1
         return new_key
 
     def add_state(self, key: str, state: Any):
-        if self.checkins[-1]["state"] is None:
-            self.checkins[-1]["state"] = {}
+        if self.state is None:
+            self.state = {}
         key = self.__get_key(key)
-        self.checkins[-1]["state"][key] = state
-        self.checkins[-1]["keys"].add(key)
+        self.state[key] = state
+        self.keys.add(key)
 
     def add_file(
         self,
@@ -173,15 +156,15 @@ class CheckbinRunner:
         media_type: Optional[MediaType] = None,
         pickle: bool = False,
     ):
-        if self.checkins[-1]["files"] is None:
-            self.checkins[-1]["files"] = {}
+        if self.files is None:
+            self.files = {}
         key = self.__get_key(key)
-        self.checkins[-1]["files"][key] = {
+        self.files[key] = {
             "url": url,
             "mediaType": media_type,
             "pickle": pickle,
         }
-        self.checkins[-1]["keys"].add(key)
+        self.keys.add(key)
 
     def upload_file(
         self,
@@ -289,10 +272,103 @@ class CheckbinRunner:
             cv2.imwrite(tmp_file.name, array)
             self.upload_file(container, storage_service, key, tmp_file.name, "image")
 
+
+class CheckbinRunner:
+    def __init__(
+        self,
+        run_id: str,
+        parent_id: str,
+        file_uploader: CheckbinFileUploader,
+        input_state: Optional[Any] = None,
+    ):
+        self.run_id = run_id
+        self.parent_id = parent_id
+        self.file_uploader = file_uploader
+        self.input_state = input_state
+        self.checkins: list[CheckbinCheckin] = []
+        self.is_running = False
+
+    def checkpoint(
+        self,
+        name: str,
+        ids: Optional[dict[str, str | int | float]] = None,
+    ):
+        self.checkins.append(CheckbinCheckin(self.file_uploader, name, ids))
+
+        if not self.is_running:
+            requests.patch(
+                f"https://checkbin-server-prod-d332d31d3c50.herokuapp.com/run/{self.run_id}/job",
+                headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+                json={"jobs": [{"checkinId": self.parent_id, "status": "running"}]},
+                timeout=30,
+            )
+            self.is_running = True
+
+    def add_state(self, key: str, state: Any):
+        self.checkins[-1].add_state(key, state)
+
+    def add_file(
+        self,
+        key: str,
+        url: str,
+        media_type: Optional[MediaType] = None,
+        pickle: bool = False,
+    ):
+        self.checkins[-1].add_file(key, url, media_type, pickle)
+
+    def upload_file(
+        self,
+        container: str,
+        storage_service: Literal["azure", "aws", "gcp"],
+        key: str,
+        file_path: str,
+        media_type: Optional[MediaType] = None,
+        pickle: bool = False,
+    ):
+        self.checkins[-1].upload_file(
+            container, storage_service, key, file_path, media_type, pickle
+        )
+
+    def upload_pickle(
+        self,
+        container: str,
+        storage_service: Literal["azure", "aws", "gcp"],
+        key: str,
+        variable: Any,
+    ):
+        self.checkins[-1].upload_pickle(container, storage_service, key, variable)
+
+    def upload_array_as_image(
+        self,
+        container: str,
+        storage_service: Literal["azure", "aws", "gcp"],
+        key: str,
+        array: numpy.ndarray | torch.Tensor,
+        range: Tuple[int, int] = (0, 255),
+        colorspace: Optional[
+            Literal[
+                "BGR",
+                "BGRA",
+                "RGBA",
+                "RGB",
+                "GRAY",
+                "YCrCb",
+                "HSV",
+                "Lab",
+                "Luv",
+                "HLS",
+                "YUV",
+            ]
+        ] = None,
+    ):
+        self.checkins[-1].upload_array_as_image(
+            container, storage_service, key, array, range, colorspace
+        )
+
     def submit_test(self):
         self.checkpoint("Output")
-        self.checkins[-1]["state"] = self.checkins[-2]["state"]
-        self.checkins[-1]["files"] = self.checkins[-2]["files"]
+        self.checkins[-1].state = self.checkins[-2].state
+        self.checkins[-1].files = self.checkins[-2].files
 
         requests.post(
             "https://checkbin-server-prod-d332d31d3c50.herokuapp.com/checkin",
@@ -300,7 +376,7 @@ class CheckbinRunner:
             json={
                 "runId": self.run_id,
                 "parentId": self.parent_id,
-                "checkins": self.checkins,
+                "checkins": [checkin.get_state() for checkin in self.checkins],
             },
             timeout=30,
         )
