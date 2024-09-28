@@ -389,6 +389,36 @@ class CheckbinRunner:
         )
 
 
+class CheckbinInputSet:
+    def __init__(self, app_key: str, file_uploader: CheckbinFileUploader, name: str):
+        self.app_key = app_key
+        self.file_uploader = file_uploader
+        self.name = name
+        self.checkins: list[CheckbinCheckin] = []
+        self.set_id = None
+
+    def add_input(self):
+        checkin = CheckbinCheckin(self.file_uploader, "Input")
+        self.checkins.append(checkin)
+        return checkin
+
+    def submit_set(self):
+        set_response = requests.post(
+            "https://checkbin-server-prod-d332d31d3c50.herokuapp.com/set",
+            headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            json={
+                "appKey": self.app_key,
+                "name": self.name,
+                "isInput": True,
+                "checkins": [checkin.get_state() for checkin in self.checkins],
+            },
+            timeout=30,
+        )
+        set_data = json.loads(set_response.content)
+        self.set_id = set_data["id"]
+        return self.set_id
+
+
 class CheckbinApp:
     def __init__(self, app_key: str):
         self.app_key = app_key
@@ -405,6 +435,9 @@ class CheckbinApp:
 
     def add_gcp_credentials_json(self, service_account_json: str):
         self.file_uploader.add_gcp_credentials_json(service_account_json)
+
+    def create_input_set(self, name: str) -> CheckbinInputSet:
+        return CheckbinInputSet(self.app_key, self.file_uploader, name)
 
     def start_run(
         self,
