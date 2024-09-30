@@ -445,16 +445,24 @@ class CheckbinApp:
         self.file_uploader = CheckbinFileUploader()
 
     def add_azure_credentials(self, account_name: str, account_key: str):
-        self.file_uploader.add_azure_credentials(account_name, account_key)
+        self.file_uploader.add_azure_credentials(
+            account_name=account_name, account_key=account_key
+        )
 
     def add_aws_credentials(self, access_key: str, secret_key: str):
-        self.file_uploader.add_aws_credentials(access_key, secret_key)
+        self.file_uploader.add_aws_credentials(
+            access_key=access_key, secret_key=secret_key
+        )
 
     def add_gcp_credentials_info(self, service_account_info: dict):
-        self.file_uploader.add_gcp_credentials_info(service_account_info)
+        self.file_uploader.add_gcp_credentials_info(
+            service_account_info=service_account_info
+        )
 
     def add_gcp_credentials_json(self, service_account_json: str):
-        self.file_uploader.add_gcp_credentials_json(service_account_json)
+        self.file_uploader.add_gcp_credentials_json(
+            service_account_json=service_account_json
+        )
 
     def create_input_set(self, name: str) -> CheckbinInputSet:
         return CheckbinInputSet(self.app_key, self.file_uploader, name)
