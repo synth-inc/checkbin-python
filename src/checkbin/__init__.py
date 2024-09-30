@@ -465,7 +465,9 @@ class CheckbinApp:
         )
 
     def create_input_set(self, name: str) -> CheckbinInputSet:
-        return CheckbinInputSet(self.app_key, self.file_uploader, name)
+        return CheckbinInputSet(
+            app_key=self.app_key, file_uploader=self.file_uploader, name=name
+        )
 
     def start_run(
         self,
