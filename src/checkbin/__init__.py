@@ -305,7 +305,7 @@ class CheckbinRunner:
             self.is_running = True
 
     def add_state(self, key: str, state: Any):
-        self.checkins[-1].add_state(key, state)
+        self.checkins[-1].add_state(key=key, state=state)
 
     def add_file(
         self,
@@ -314,7 +314,12 @@ class CheckbinRunner:
         media_type: Optional[MediaType] = None,
         pickle: bool = False,
     ):
-        self.checkins[-1].add_file(key, url, media_type, pickle)
+        self.checkins[-1].add_file(
+            key=key,
+            url=url,
+            media_type=media_type,
+            pickle=pickle,
+        )
 
     def upload_file(
         self,
@@ -326,7 +331,12 @@ class CheckbinRunner:
         pickle: bool = False,
     ):
         self.checkins[-1].upload_file(
-            container, storage_service, key, file_path, media_type, pickle
+            container=container,
+            storage_service=storage_service,
+            key=key,
+            file_path=file_path,
+            media_type=media_type,
+            pickle=pickle,
         )
 
     def upload_pickle(
@@ -336,7 +346,12 @@ class CheckbinRunner:
         key: str,
         variable: Any,
     ):
-        self.checkins[-1].upload_pickle(container, storage_service, key, variable)
+        self.checkins[-1].upload_pickle(
+            container=container,
+            storage_service=storage_service,
+            key=key,
+            variable=variable,
+        )
 
     def upload_array_as_image(
         self,
@@ -362,7 +377,12 @@ class CheckbinRunner:
         ] = None,
     ):
         self.checkins[-1].upload_array_as_image(
-            container, storage_service, key, array, range, colorspace
+            container=container,
+            storage_service=storage_service,
+            key=key,
+            array=array,
+            range=range,
+            colorspace=colorspace,
         )
 
     def submit_test(self):
