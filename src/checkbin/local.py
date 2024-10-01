@@ -19,7 +19,10 @@ def start_server(command, name):
     return process
 
 
-def launch(next_port=3000, fastapi_port=8000):
+def launch(next_port: int | None = None, fastapi_port: int | None = None):
+    next_port = next_port or 3000
+    fastapi_port = fastapi_port or 8000
+
     current_dir = Path(__file__).parent
 
     next_command = f"PORT={next_port} EVALUATION_API=http://localhost:{fastapi_port} node {current_dir}/client_build/server.js"

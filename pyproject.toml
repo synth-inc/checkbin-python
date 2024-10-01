@@ -39,6 +39,9 @@ Documentation = "https://github.com/synth-inc/checkbin-python#readme"
 Issues = "https://github.com/synth-inc/checkbin-python/issues"
 Source = "https://github.com/synth-inc/checkbin-python"
 
+[project.scripts]
+checkbin = "checkbin.cli:main"
+
 [tool.hatch.version]
 path = "src/checkbin/__about__.py"
 
