@@ -278,11 +278,13 @@ class CheckbinRunner:
         self,
         run_id: str,
         parent_id: str,
+        base_url: str,
         file_uploader: CheckbinFileUploader,
         input_state: Optional[Any] = None,
     ):
         self.run_id = run_id
         self.parent_id = parent_id
+        self.base_url = base_url
         self.file_uploader = file_uploader
         self.input_state = input_state
         self.checkins: list[CheckbinCheckin] = []
@@ -297,7 +299,7 @@ class CheckbinRunner:
 
         if not self.is_running:
             requests.patch(
-                f"https://checkbin-server-prod-d332d31d3c50.herokuapp.com/run/{self.run_id}/job",
+                f"{self.base_url}/run/{self.run_id}/job",
                 headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
                 json={"jobs": [{"checkinId": self.parent_id, "status": "running"}]},
                 timeout=30,
@@ -391,7 +393,7 @@ class CheckbinRunner:
         self.checkins[-1].files = self.checkins[-2].files
 
         requests.post(
-            "https://checkbin-server-prod-d332d31d3c50.herokuapp.com/checkin",
+            f"{self.base_url}/checkin",
             headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
             json={
                 "runId": self.run_id,
@@ -402,7 +404,7 @@ class CheckbinRunner:
         )
 
         requests.patch(
-            f"https://checkbin-server-prod-d332d31d3c50.herokuapp.com/run/{self.run_id}/job",
+            f"{self.base_url}/run/{self.run_id}/job",
             headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
             json={"jobs": [{"checkinId": self.parent_id, "status": "completed"}]},
             timeout=30,
@@ -410,8 +412,15 @@ class CheckbinRunner:
 
 
 class CheckbinInputSet:
-    def __init__(self, app_key: str, file_uploader: CheckbinFileUploader, name: str):
+    def __init__(
+        self,
+        app_key: str,
+        base_url: str,
+        file_uploader: CheckbinFileUploader,
+        name: str,
+    ):
         self.app_key = app_key
+        self.base_url = base_url
         self.file_uploader = file_uploader
         self.name = name
         self.checkins: list[CheckbinCheckin] = []
@@ -424,7 +433,7 @@ class CheckbinInputSet:
 
     def submit_set(self):
         set_response = requests.post(
-            "https://checkbin-server-prod-d332d31d3c50.herokuapp.com/set",
+            f"{self.base_url}/set",
             headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
             json={
                 "appKey": self.app_key,
@@ -440,8 +449,17 @@ class CheckbinInputSet:
 
 
 class CheckbinApp:
-    def __init__(self, app_key: str):
+    def __init__(
+        self,
+        app_key: str,
+        mode: Literal["local", "remote"] = "local",
+        port: int = 8000,
+    ):
         self.app_key = app_key
+        if mode == "local":
+            self.base_url = f"http://localhost:{port}"
+        else:
+            self.base_url = "https://checkbin-server-prod-d332d31d3c50.herokuapp.com"
         self.file_uploader = CheckbinFileUploader()
 
     def add_azure_credentials(self, account_name: str, account_key: str):
@@ -466,7 +484,10 @@ class CheckbinApp:
 
     def create_input_set(self, name: str) -> CheckbinInputSet:
         return CheckbinInputSet(
-            app_key=self.app_key, file_uploader=self.file_uploader, name=name
+            app_key=self.app_key,
+            base_url=self.base_url,
+            file_uploader=self.file_uploader,
+            name=name,
         )
 
     def start_run(
@@ -476,7 +497,7 @@ class CheckbinApp:
         sample_size: Optional[int] = None,
     ) -> list[CheckbinRunner]:
         run_response = requests.post(
-            "https://checkbin-server-prod-d332d31d3c50.herokuapp.com/run",
+            f"{self.base_url}/run",
             headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
             json={"appKey": self.app_key},
             timeout=30,
@@ -487,7 +508,7 @@ class CheckbinApp:
         checkins = []
         if checkin_id is not None:
             checkin_response = requests.get(
-                f"https://checkbin-server-prod-d332d31d3c50.herokuapp.com/checkin/{checkin_id}",
+                f"{self.base_url}/checkin/{checkin_id}",
                 headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
                 params={"includeState": "true"},
                 timeout=30,
@@ -496,7 +517,7 @@ class CheckbinApp:
             checkins = [checkin]
         elif set_id is not None:
             set_response = requests.get(
-                f"https://checkbin-server-prod-d332d31d3c50.herokuapp.com/set/{set_id}",
+                f"{self.base_url}/set/{set_id}",
                 headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
                 params={"includeCheckins": "true", "includeState": "true"},
                 timeout=30,
@@ -509,7 +530,7 @@ class CheckbinApp:
             raise Exception("Either checkin_id or set_id must be provided")
 
         requests.patch(
-            f"https://checkbin-server-prod-d332d31d3c50.herokuapp.com/run/{run_id}/job",
+            f"{self.base_url}/run/{run_id}/job",
             headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
             json={"jobs": [{"checkinId": checkin["id"]} for checkin in checkins]},
             timeout=30,
@@ -522,6 +543,7 @@ class CheckbinApp:
             runner = CheckbinRunner(
                 run_id=run_id,
                 parent_id=checkin["id"],
+                base_url=self.base_url,
                 file_uploader=self.file_uploader,
                 input_state={state["name"]: state for state in checkin["state"]},
             )
