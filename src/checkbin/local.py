@@ -19,13 +19,11 @@ def start_server(command, name):
     return process
 
 
-def launch():
+def launch(next_port=3000, fastapi_port=8000):
     current_dir = Path(__file__).parent
 
-    next_command = f"node {current_dir}/client_build/server.js"
-    fastapi_command = (
-        f"uvicorn --app-dir {current_dir} server:app --host 0.0.0.0 --port 8000"
-    )
+    next_command = f"PORT={next_port} EVALUATION_API=http://localhost:{fastapi_port} node {current_dir}/client_build/server.js"
+    fastapi_command = f"uvicorn --app-dir {current_dir} server:app --host 0.0.0.0 --port {fastapi_port}"
 
     next_process = start_server(next_command, "Next.js Server")
     fastapi_process = start_server(fastapi_command, "FastAPI Server")
