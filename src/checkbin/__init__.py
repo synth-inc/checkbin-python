@@ -305,9 +305,11 @@ class CheckbinRunner:
 
         if not self.is_running:
             requests.patch(
-                f"{self.base_url}/run/{self.run_id}/job",
+                f"{self.base_url}/run/{self.run_id}/testStatus",
                 headers=get_headers(),
-                json={"jobs": [{"checkinId": self.parent_id, "status": "running"}]},
+                json={
+                    "testStatuses": [{"checkinId": self.parent_id, "value": "running"}]
+                },
                 timeout=30,
             )
             self.is_running = True
@@ -410,9 +412,11 @@ class CheckbinRunner:
         )
 
         requests.patch(
-            f"{self.base_url}/run/{self.run_id}/job",
+            f"{self.base_url}/run/{self.run_id}/testStatus",
             headers=get_headers(),
-            json={"jobs": [{"checkinId": self.parent_id, "status": "completed"}]},
+            json={
+                "testStatuses": [{"checkinId": self.parent_id, "value": "completed"}]
+            },
             timeout=30,
         )
 
@@ -536,13 +540,15 @@ class CheckbinApp:
             raise Exception("Either checkin_id or set_id must be provided")
 
         requests.patch(
-            f"{self.base_url}/run/{run_id}/job",
+            f"{self.base_url}/run/{run_id}/testStatus",
             headers=get_headers(),
-            json={"jobs": [{"checkinId": checkin["id"]} for checkin in checkins]},
+            json={
+                "testStatuses": [{"checkinId": checkin["id"]} for checkin in checkins]
+            },
             timeout=30,
         )
 
-        print(f"Checkbin: started run {run_id} with {len(checkins)} jobs")
+        print(f"Checkbin: started run {run_id} with {len(checkins)} tests")
 
         runners = []
         for checkin in checkins:
