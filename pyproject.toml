@@ -32,6 +32,8 @@ dependencies = [
   "boto3",
   "azure-storage-blob",
   "google-cloud-storage",
+  "fastapi",
+  "tinydb",
 ]
 
 [project.urls]
