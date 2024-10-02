@@ -31,6 +31,12 @@ def authenticate(token: str):
     AUTH_TOKEN = token
 
 
+def get_headers():
+    if AUTH_TOKEN is not None:
+        return {"Authorization": f"Bearer {AUTH_TOKEN}"}
+    return {}
+
+
 class CheckbinFileUploader:
     def __init__(self):
         self.azure_account_name = None
@@ -300,7 +306,7 @@ class CheckbinRunner:
         if not self.is_running:
             requests.patch(
                 f"{self.base_url}/run/{self.run_id}/job",
-                headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+                headers=get_headers(),
                 json={"jobs": [{"checkinId": self.parent_id, "status": "running"}]},
                 timeout=30,
             )
@@ -394,7 +400,7 @@ class CheckbinRunner:
 
         requests.post(
             f"{self.base_url}/checkin",
-            headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            headers=get_headers(),
             json={
                 "runId": self.run_id,
                 "parentId": self.parent_id,
@@ -405,7 +411,7 @@ class CheckbinRunner:
 
         requests.patch(
             f"{self.base_url}/run/{self.run_id}/job",
-            headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            headers=get_headers(),
             json={"jobs": [{"checkinId": self.parent_id, "status": "completed"}]},
             timeout=30,
         )
@@ -434,7 +440,7 @@ class CheckbinInputSet:
     def submit_set(self):
         set_response = requests.post(
             f"{self.base_url}/set",
-            headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            headers=get_headers(),
             json={
                 "appKey": self.app_key,
                 "name": self.name,
@@ -498,7 +504,7 @@ class CheckbinApp:
     ) -> list[CheckbinRunner]:
         run_response = requests.post(
             f"{self.base_url}/run",
-            headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            headers=get_headers(),
             json={"appKey": self.app_key},
             timeout=30,
         )
@@ -509,7 +515,7 @@ class CheckbinApp:
         if checkin_id is not None:
             checkin_response = requests.get(
                 f"{self.base_url}/checkin/{checkin_id}",
-                headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+                headers=get_headers(),
                 params={"includeState": "true"},
                 timeout=30,
             )
@@ -518,7 +524,7 @@ class CheckbinApp:
         elif set_id is not None:
             set_response = requests.get(
                 f"{self.base_url}/set/{set_id}",
-                headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+                headers=get_headers(),
                 params={"includeCheckins": "true", "includeState": "true"},
                 timeout=30,
             )
@@ -531,7 +537,7 @@ class CheckbinApp:
 
         requests.patch(
             f"{self.base_url}/run/{run_id}/job",
-            headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            headers=get_headers(),
             json={"jobs": [{"checkinId": checkin["id"]} for checkin in checkins]},
             timeout=30,
         )
