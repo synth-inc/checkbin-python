@@ -279,7 +279,7 @@ class Checkin:
             self.upload_file(container, storage_service, key, tmp_file.name, "image")
 
 
-class Runner:
+class Bin:
     def __init__(
         self,
         run_id: str,
@@ -524,7 +524,7 @@ class App:
         checkin_id: Optional[str] = None,
         set_id: Optional[str] = None,
         sample_size: Optional[int] = None,
-    ) -> list[Runner]:
+    ) -> list[Bin]:
         run_response = requests.post(
             f"{self.base_url}/run",
             headers=get_headers(),
@@ -569,14 +569,14 @@ class App:
 
         print(f"Checkbin: started run {run_id} with {len(checkins)} tests")
 
-        runners = []
+        bins = []
         for checkin in checkins:
-            runner = Runner(
+            bin = Bin(
                 run_id=run_id,
                 parent_id=checkin["id"],
                 base_url=self.base_url,
                 file_uploader=self.file_uploader,
                 input_state={state["name"]: state for state in checkin["state"]},
             )
-            runners.append(runner)
-        return runners
+            bins.append(bin)
+        return bins
