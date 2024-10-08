@@ -37,7 +37,7 @@ def get_headers():
     return {}
 
 
-class CheckbinFileUploader:
+class FileUploader:
     def __init__(self):
         self.azure_account_name = None
         self.azure_account_key = None
@@ -115,10 +115,10 @@ class CheckbinFileUploader:
         return f"https://storage.googleapis.com/{bucket}/{filename}"
 
 
-class CheckbinCheckin:
+class Checkin:
     def __init__(
         self,
-        file_uploader: CheckbinFileUploader,
+        file_uploader: FileUploader,
         name: str,
         ids: Optional[dict[str, str | int | float]] = None,
     ):
@@ -279,13 +279,13 @@ class CheckbinCheckin:
             self.upload_file(container, storage_service, key, tmp_file.name, "image")
 
 
-class CheckbinRunner:
+class Runner:
     def __init__(
         self,
         run_id: str,
         parent_id: str,
         base_url: str,
-        file_uploader: CheckbinFileUploader,
+        file_uploader: FileUploader,
         input_state: Optional[dict[str, Any]] = None,
     ):
         self.run_id = run_id
@@ -293,7 +293,7 @@ class CheckbinRunner:
         self.base_url = base_url
         self.file_uploader = file_uploader
         self.input_state = input_state
-        self.checkins: list[CheckbinCheckin] = []
+        self.checkins: list[Checkin] = []
         self.is_running = False
 
     def get_input_data(self, key: str) -> Optional[Any]:
@@ -320,7 +320,7 @@ class CheckbinRunner:
         name: str,
         ids: Optional[dict[str, str | int | float]] = None,
     ):
-        self.checkins.append(CheckbinCheckin(self.file_uploader, name, ids))
+        self.checkins.append(Checkin(self.file_uploader, name, ids))
 
         if not self.is_running:
             requests.patch(
@@ -440,23 +440,23 @@ class CheckbinRunner:
         )
 
 
-class CheckbinInputSet:
+class InputSet:
     def __init__(
         self,
         app_key: str,
         base_url: str,
-        file_uploader: CheckbinFileUploader,
+        file_uploader: FileUploader,
         name: str,
     ):
         self.app_key = app_key
         self.base_url = base_url
         self.file_uploader = file_uploader
         self.name = name
-        self.checkins: list[CheckbinCheckin] = []
+        self.checkins: list[Checkin] = []
         self.set_id = None
 
     def add_input(self):
-        checkin = CheckbinCheckin(self.file_uploader, "Input")
+        checkin = Checkin(self.file_uploader, "Input")
         self.checkins.append(checkin)
         return checkin
 
@@ -477,7 +477,7 @@ class CheckbinInputSet:
         return self.set_id
 
 
-class CheckbinApp:
+class App:
     def __init__(
         self,
         app_key: str,
@@ -489,7 +489,7 @@ class CheckbinApp:
             self.base_url = f"http://localhost:{port}"
         else:
             self.base_url = "https://checkbin-server-prod-d332d31d3c50.herokuapp.com"
-        self.file_uploader = CheckbinFileUploader()
+        self.file_uploader = FileUploader()
 
     def add_azure_credentials(self, account_name: str, account_key: str):
         self.file_uploader.add_azure_credentials(
@@ -511,8 +511,8 @@ class CheckbinApp:
             service_account_json=service_account_json
         )
 
-    def create_input_set(self, name: str) -> CheckbinInputSet:
-        return CheckbinInputSet(
+    def create_input_set(self, name: str) -> InputSet:
+        return InputSet(
             app_key=self.app_key,
             base_url=self.base_url,
             file_uploader=self.file_uploader,
@@ -524,7 +524,7 @@ class CheckbinApp:
         checkin_id: Optional[str] = None,
         set_id: Optional[str] = None,
         sample_size: Optional[int] = None,
-    ) -> list[CheckbinRunner]:
+    ) -> list[Runner]:
         run_response = requests.post(
             f"{self.base_url}/run",
             headers=get_headers(),
@@ -571,7 +571,7 @@ class CheckbinApp:
 
         runners = []
         for checkin in checkins:
-            runner = CheckbinRunner(
+            runner = Runner(
                 run_id=run_id,
                 parent_id=checkin["id"],
                 base_url=self.base_url,
