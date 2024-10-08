@@ -315,7 +315,7 @@ class Bin:
             "pickle": self.input_state["key"]["pickle"],
         }
 
-    def checkpoint(
+    def checkin(
         self,
         name: str,
         ids: Optional[dict[str, str | int | float]] = None,
@@ -415,7 +415,7 @@ class Bin:
         )
 
     def submit(self):
-        self.checkpoint("Output")
+        self.checkin("Output")
         self.checkins[-1].state = self.checkins[-2].state
         self.checkins[-1].files = self.checkins[-2].files
 
