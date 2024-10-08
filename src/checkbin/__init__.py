@@ -395,7 +395,7 @@ class CheckbinRunner:
             colorspace=colorspace,
         )
 
-    def submit_test(self):
+    def submit(self):
         self.checkpoint("Output")
         self.checkins[-1].state = self.checkins[-2].state
         self.checkins[-1].files = self.checkins[-2].files
@@ -441,7 +441,7 @@ class CheckbinInputSet:
         self.checkins.append(checkin)
         return checkin
 
-    def submit_set(self):
+    def submit(self):
         set_response = requests.post(
             f"{self.base_url}/set",
             headers=get_headers(),
