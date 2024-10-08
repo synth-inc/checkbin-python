@@ -1,6 +1,7 @@
 import uuid
 from typing import Literal, Optional
 from pathlib import Path
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -42,6 +43,8 @@ def create_checkin(
         "name": checkin.name,
         "ids": checkin.ids,
         "isOutput": is_output,
+        "createdAt": datetime.now().isoformat(),
+        "updatedAt": datetime.now().isoformat(),
     }
     checkin_table.insert(new_checkin)
     state_list = []
@@ -53,6 +56,8 @@ def create_checkin(
                     "checkinId": new_checkin["id"],
                     "name": key,
                     "data": value,
+                    "createdAt": datetime.now().isoformat(),
+                    "updatedAt": datetime.now().isoformat(),
                 }
             )
     if checkin.files is not None:
@@ -61,6 +66,8 @@ def create_checkin(
                 "id": str(uuid.uuid4()),
                 "checkinId": new_checkin["id"],
                 "name": key,
+                "createdAt": datetime.now().isoformat(),
+                "updatedAt": datetime.now().isoformat(),
             }
             state.update(file)
             state_list.append(state)
@@ -153,6 +160,8 @@ def add_checkin_to_set(set_id: str, checkin_id: str):
         {
             "setId": set_id,
             "checkinId": checkin_id,
+            "createdAt": datetime.now().isoformat(),
+            "updatedAt": datetime.now().isoformat(),
         }
     )
 
@@ -161,7 +170,13 @@ def add_checkin_to_set(set_id: str, checkin_id: str):
 def create_set(body: PostSet):
     set_table = db.table("set")
     set_id = str(uuid.uuid4())
-    new_set = {"id": set_id, "name": body.name, "isInput": body.isInput}
+    new_set = {
+        "id": set_id,
+        "name": body.name,
+        "isInput": body.isInput,
+        "createdAt": datetime.now().isoformat(),
+        "updatedAt": datetime.now().isoformat(),
+    }
     set_table.insert(new_set)
     for checkin in body.checkins:
         checkin.name = "Input"
@@ -190,6 +205,12 @@ def get_checkin_ancestors(checkins: list[dict], include_state: bool):
                     Query().checkinId == current_checkin["id"]
                 )
                 current_checkin["state"] = state
+            current_checkin.update(
+                {
+                    "createdAt": datetime.now().isoformat(),
+                    "updatedAt": datetime.now().isoformat(),
+                }
+            )
             test.insert(0, current_checkin)
             parent_checkin = checkin_table.search(
                 Query().id == current_checkin["parentId"]
@@ -243,7 +264,12 @@ def create_run(body: PostRun):
     name = body.name
     if name is None:
         name = f"Run {get_run_count() + 1}"
-    new_run = {"id": run_id, "name": name}
+    new_run = {
+        "id": run_id,
+        "name": name,
+        "createdAt": datetime.now().isoformat(),
+        "updatedAt": datetime.now().isoformat(),
+    }
     run_table.insert(new_run)
     return new_run
 
@@ -277,12 +303,17 @@ def update_test_status(runId: str, body: PatchTestStatuses):
                     "runId": runId,
                     "checkinId": test_status.checkinId,
                     "value": test_status.value,
+                    "createdAt": datetime.now().isoformat(),
+                    "updatedAt": datetime.now().isoformat(),
                 }
             )
         else:
             update_query = Query()
             test_status_table.update(
-                {"value": test_status.value},
+                {
+                    "value": test_status.value,
+                    "updatedAt": datetime.now().isoformat(),
+                },
                 update_query.runId == runId
                 and read_query.checkinId == test_status.checkinId,
             )
