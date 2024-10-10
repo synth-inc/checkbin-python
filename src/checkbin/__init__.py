@@ -6,6 +6,7 @@ import os
 import time
 import uuid
 import json
+import copy
 import random
 import pickle
 import tempfile
@@ -522,6 +523,7 @@ class App:
         checkin_id: Optional[str] = None,
         set_id: Optional[str] = None,
         sample_size: Optional[int] = None,
+        duplicate_factor: Optional[int] = None,
     ) -> list[Bin]:
         run_response = requests.post(
             f"{self.base_url}/run",
@@ -556,6 +558,15 @@ class App:
         else:
             raise Exception("Either checkin_id or set_id must be provided")
 
+        checkins_dict = {checkin["id"]: checkin for checkin in checkins}
+
+        if duplicate_factor is not None:
+            checkins = [
+                copy.deepcopy(checkin)
+                for _ in range(duplicate_factor)
+                for checkin in checkins
+            ]
+
         tests_response = requests.post(
             f"{self.base_url}/test",
             headers=get_headers(),
@@ -566,21 +577,21 @@ class App:
             timeout=30,
         )
         tests = json.loads(tests_response.content)
-        checkin_test_dic = {}
-        for test in tests:
-            checkin_test_dic[test["inputCheckinId"]] = test["id"]
 
-        print(f"Checkbin: started run {run_id} with {len(checkins)} tests")
+        print(f"Checkbin: started run {run_id} with {len(tests)} tests")
 
         bins = []
-        for checkin in checkins:
+        for test in tests:
             bin = Bin(
-                test_id=checkin_test_dic[checkin["id"]],
+                test_id=test["id"],
                 run_id=run_id,
-                parent_id=checkin["id"],
+                parent_id=test["inputCheckinId"],
                 base_url=self.base_url,
                 file_uploader=self.file_uploader,
-                input_state={state["name"]: state for state in checkin["state"]},
+                input_state={
+                    state["name"]: state
+                    for state in checkins_dict[test["inputCheckinId"]]["state"]
+                },
             )
             bins.append(bin)
         return bins
