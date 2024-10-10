@@ -326,12 +326,13 @@ class Bin:
         self.checkins.append(Checkin(self.file_uploader, name, ids))
 
         if not self.is_running:
-            requests.patch(
+            test_response = requests.patch(
                 f"{self.base_url}/test/{self.test_id}",
                 headers=get_headers(),
                 json={"status": "running"},
                 timeout=30,
             )
+            test_response.raise_for_status()
             self.is_running = True
 
     def add_state(self, name: str, state: Any):
@@ -420,7 +421,7 @@ class Bin:
         self.checkins[-1].state = self.checkins[-2].state
         self.checkins[-1].files = self.checkins[-2].files
 
-        requests.post(
+        create_response = requests.post(
             f"{self.base_url}/checkin",
             headers=get_headers(),
             json={
@@ -430,13 +431,15 @@ class Bin:
             },
             timeout=30,
         )
+        create_response.raise_for_status()
 
-        requests.patch(
+        test_response = requests.patch(
             f"{self.base_url}/test/{self.test_id}",
             headers=get_headers(),
             json={"status": "completed"},
             timeout=30,
         )
+        test_response.raise_for_status()
 
 
 class InputSet:
@@ -471,6 +474,7 @@ class InputSet:
             },
             timeout=30,
         )
+        set_response.raise_for_status()
         set_data = json.loads(set_response.content)
         self.set_id = set_data["id"]
         return self.set_id
@@ -531,6 +535,7 @@ class App:
             json={"appKey": self.app_key},
             timeout=30,
         )
+        run_response.raise_for_status()
         run_data = json.loads(run_response.content)
         run_id = run_data["id"]
 
@@ -542,6 +547,7 @@ class App:
                 params={"includeState": "true"},
                 timeout=30,
             )
+            checkin_response.raise_for_status()
             checkin = json.loads(checkin_response.content)
             checkins = [checkin]
         elif set_id is not None:
@@ -551,6 +557,7 @@ class App:
                 params={"includeCheckins": "true", "includeState": "true"},
                 timeout=30,
             )
+            set_response.raise_for_status()
             set = json.loads(set_response.content)
             checkins = set["checkins"]
             if sample_size is not None:
@@ -576,6 +583,7 @@ class App:
             },
             timeout=30,
         )
+        tests_response.raise_for_status()
         tests = json.loads(tests_response.content)
 
         print(f"Checkbin: started run {run_id} with {len(tests)} tests")
