@@ -282,12 +282,14 @@ class Checkin:
 class Bin:
     def __init__(
         self,
+        test_id: str,
         run_id: str,
         parent_id: str,
         base_url: str,
         file_uploader: FileUploader,
         input_state: Optional[dict[str, Any]] = None,
     ):
+        self.test_id = test_id
         self.run_id = run_id
         self.parent_id = parent_id
         self.base_url = base_url
@@ -324,11 +326,9 @@ class Bin:
 
         if not self.is_running:
             requests.patch(
-                f"{self.base_url}/run/{self.run_id}/testStatus",
+                f"{self.base_url}/test/{self.test_id}",
                 headers=get_headers(),
-                json={
-                    "testStatuses": [{"checkinId": self.parent_id, "value": "running"}]
-                },
+                json={"status": "running"},
                 timeout=30,
             )
             self.is_running = True
@@ -431,11 +431,9 @@ class Bin:
         )
 
         requests.patch(
-            f"{self.base_url}/run/{self.run_id}/testStatus",
+            f"{self.base_url}/test/{self.test_id}",
             headers=get_headers(),
-            json={
-                "testStatuses": [{"checkinId": self.parent_id, "value": "completed"}]
-            },
+            json={"status": "completed"},
             timeout=30,
         )
 
@@ -558,20 +556,26 @@ class App:
         else:
             raise Exception("Either checkin_id or set_id must be provided")
 
-        requests.patch(
-            f"{self.base_url}/run/{run_id}/testStatus",
+        tests_response = requests.post(
+            f"{self.base_url}/test",
             headers=get_headers(),
             json={
-                "testStatuses": [{"checkinId": checkin["id"]} for checkin in checkins]
+                "runId": run_id,
+                "tests": [{"inputCheckinId": checkin["id"]} for checkin in checkins],
             },
             timeout=30,
         )
+        tests = json.loads(tests_response.content)
+        checkin_test_dic = {}
+        for test in tests:
+            checkin_test_dic[test["inputCheckinId"]] = test["id"]
 
         print(f"Checkbin: started run {run_id} with {len(checkins)} tests")
 
         bins = []
         for checkin in checkins:
             bin = Bin(
+                test_id=checkin_test_dic[checkin["id"]],
                 run_id=run_id,
                 parent_id=checkin["id"],
                 base_url=self.base_url,
