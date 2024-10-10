@@ -274,46 +274,54 @@ def create_run(body: PostRun):
     return new_run
 
 
-@app.get("/run/{runId}/testStatus")
-def get_test_status(runId: str):
-    test_status_table = db.table("testStatus")
-    return test_status_table.search(Query().runId == runId)
+# Test
+@app.get("/test")
+def get_test(runId: str):
+    test_table = db.table("test")
+    return test_table.search(Query().runId == runId)
 
 
-class TestStatus(BaseModel):
-    checkinId: str
-    value: Literal["pending", "running", "completed", "failed"] = "pending"
+class Test(BaseModel):
+    inputCheckinId: str
+    status: Literal["pending", "running", "completed", "failed"] = "pending"
 
 
-class PatchTestStatuses(BaseModel):
-    testStatuses: list[TestStatus]
+class PostTests(BaseModel):
+    runId: str
+    tests: list[Test]
 
 
-@app.patch("/run/{runId}/testStatus")
-def update_test_status(runId: str, body: PatchTestStatuses):
-    test_status_table = db.table("testStatus")
-    for test_status in body.testStatuses:
-        read_query = Query()
-        current_test_status = test_status_table.search(
-            read_query.runId == runId and read_query.checkinId == test_status.checkinId
+@app.post("/test")
+def create_tests(body: PostTests):
+    test_table = db.table("test")
+    for test in body.tests:
+        test_table.insert(
+            {
+                "id": str(uuid.uuid4()),
+                "runId": body.runId,
+                "inputCheckinId": test.inputCheckinId,
+                "status": test.status,
+                "createdAt": datetime.now().isoformat(),
+                "updatedAt": datetime.now().isoformat(),
+            }
         )
-        if len(current_test_status) == 0:
-            test_status_table.insert(
-                {
-                    "runId": runId,
-                    "checkinId": test_status.checkinId,
-                    "value": test_status.value,
-                    "createdAt": datetime.now().isoformat(),
-                    "updatedAt": datetime.now().isoformat(),
-                }
-            )
-        else:
-            update_query = Query()
-            test_status_table.update(
-                {
-                    "value": test_status.value,
-                    "updatedAt": datetime.now().isoformat(),
-                },
-                update_query.runId == runId
-                and read_query.checkinId == test_status.checkinId,
-            )
+    return test_table.search(Query().runId == body.runId)
+
+
+class PatchTest(BaseModel):
+    status: Literal["pending", "running", "completed", "failed"]
+
+
+@app.patch("/test/{testId}")
+def update_test(testId: str, body: PatchTest):
+    test_table = db.table("test")
+    ids = test_table.update(
+        {
+            "status": body.status,
+            "updatedAt": datetime.now().isoformat(),
+        },
+        Query().id == testId,
+    )
+    if len(ids) == 0:
+        raise HTTPException(status_code=404, detail=f"No test found with id {testId}")
+    return test_table.get(doc_id=ids[0])
