@@ -302,20 +302,20 @@ class Bin:
     def get_input_data(self, key: str) -> Optional[Any]:
         if self.input_state is None or key not in self.input_state:
             return None
-        return self.input_state["key"]["data"]
+        return self.input_state[key]["data"]
 
     def get_input_file_url(self, key: str) -> Optional[str]:
         if self.input_state is None or key not in self.input_state:
             return None
-        return self.input_state["key"]["url"]
+        return self.input_state[key]["url"]
 
     def get_input_file(self, key: str) -> Optional[dict[str, Any]]:
         if self.input_state is None or key not in self.input_state:
             return None
         return {
-            "url": self.input_state["key"]["url"],
-            "media_type": self.input_state["key"]["mediaType"],
-            "pickle": self.input_state["key"]["pickle"],
+            "url": self.input_state[key]["url"],
+            "media_type": self.input_state[key]["mediaType"],
+            "pickle": self.input_state[key]["pickle"],
         }
 
     def checkin(
