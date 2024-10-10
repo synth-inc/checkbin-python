@@ -126,7 +126,7 @@ class Checkin:
         self.file_uploader = file_uploader
         self.name = name
         self.ids = ids
-        self.keys = set()
+        self.names = set()
         self.state = None
         self.files = None
 
@@ -138,46 +138,46 @@ class Checkin:
             "files": self.files,
         }
 
-    def __get_key(self, key: str) -> str:
-        if key not in self.keys:
-            return key
+    def __get_name(self, name: str) -> str:
+        if name not in self.names:
+            return name
 
         level = 1
-        new_key = key
-        while new_key in self.keys:
-            new_key = f"{key}_{level}"
+        new_name = name
+        while new_name in self.names:
+            new_name = f"{name}_{level}"
             level += 1
-        return new_key
+        return new_name
 
-    def add_state(self, key: str, state: Any):
+    def add_state(self, name: str, state: Any):
         if self.state is None:
             self.state = {}
-        key = self.__get_key(key)
-        self.state[key] = state
-        self.keys.add(key)
+        name = self.__get_name(name)
+        self.state[name] = state
+        self.names.add(name)
 
     def add_file(
         self,
-        key: str,
+        name: str,
         url: str,
         media_type: Optional[MediaType] = None,
         pickle: bool = False,
     ):
         if self.files is None:
             self.files = {}
-        key = self.__get_key(key)
-        self.files[key] = {
+        name = self.__get_name(name)
+        self.files[name] = {
             "url": url,
             "mediaType": media_type,
             "pickle": pickle,
         }
-        self.keys.add(key)
+        self.names.add(name)
 
     def upload_file(
         self,
         container: str,
         storage_service: Literal["azure", "aws", "gcp"],
-        key: str,
+        name: str,
         file_path: str,
         media_type: Optional[MediaType] = None,
         pickle: bool = False,
@@ -197,13 +197,13 @@ class Checkin:
             print(f"Checkbin: recording file upload time: {time.time() - start_time}")
             print(f"Checkbin: recorded file: {url}")
 
-        self.add_file(key, url, media_type, pickle)
+        self.add_file(name, url, media_type, pickle)
 
     def upload_pickle(
         self,
         container: str,
         storage_service: Literal["azure", "aws", "gcp"],
-        key: str,
+        name: str,
         variable: Any,
     ):
         self.file_uploader.check_credentials(storage_service)
@@ -211,7 +211,7 @@ class Checkin:
         with tempfile.NamedTemporaryFile(suffix=".pkl") as tmp_file:
             pickle.dump(variable, tmp_file)
             self.upload_file(
-                container, storage_service, key, tmp_file.name, pickle=True
+                container, storage_service, name, tmp_file.name, pickle=True
             )
 
     def __colorspace_to_conversion(self, colorspace: str) -> Optional[int]:
@@ -242,7 +242,7 @@ class Checkin:
         self,
         container: str,
         storage_service: Literal["azure", "aws", "gcp"],
-        key: str,
+        name: str,
         array: numpy.ndarray | torch.Tensor,
         range: Tuple[int, int] = (0, 255),
         colorspace: Optional[
@@ -277,7 +277,7 @@ class Checkin:
 
         with tempfile.NamedTemporaryFile(suffix=".jpg") as tmp_file:
             cv2.imwrite(tmp_file.name, array)
-            self.upload_file(container, storage_service, key, tmp_file.name, "image")
+            self.upload_file(container, storage_service, name, tmp_file.name, "image")
 
 
 class Bin:
@@ -299,23 +299,23 @@ class Bin:
         self.checkins: list[Checkin] = []
         self.is_running = False
 
-    def get_input_data(self, key: str) -> Optional[Any]:
-        if self.input_state is None or key not in self.input_state:
+    def get_input_data(self, name: str) -> Optional[Any]:
+        if self.input_state is None or name not in self.input_state:
             return None
-        return self.input_state[key]["data"]
+        return self.input_state[name]["data"]
 
-    def get_input_file_url(self, key: str) -> Optional[str]:
-        if self.input_state is None or key not in self.input_state:
+    def get_input_file_url(self, name: str) -> Optional[str]:
+        if self.input_state is None or name not in self.input_state:
             return None
-        return self.input_state[key]["url"]
+        return self.input_state[name]["url"]
 
-    def get_input_file(self, key: str) -> Optional[dict[str, Any]]:
-        if self.input_state is None or key not in self.input_state:
+    def get_input_file(self, name: str) -> Optional[dict[str, Any]]:
+        if self.input_state is None or name not in self.input_state:
             return None
         return {
-            "url": self.input_state[key]["url"],
-            "media_type": self.input_state[key]["mediaType"],
-            "pickle": self.input_state[key]["pickle"],
+            "url": self.input_state[name]["url"],
+            "media_type": self.input_state[name]["mediaType"],
+            "pickle": self.input_state[name]["pickle"],
         }
 
     def checkin(
@@ -334,18 +334,18 @@ class Bin:
             )
             self.is_running = True
 
-    def add_state(self, key: str, state: Any):
-        self.checkins[-1].add_state(key=key, state=state)
+    def add_state(self, name: str, state: Any):
+        self.checkins[-1].add_state(name=name, state=state)
 
     def add_file(
         self,
-        key: str,
+        name: str,
         url: str,
         media_type: Optional[MediaType] = None,
         pickle: bool = False,
     ):
         self.checkins[-1].add_file(
-            key=key,
+            name=name,
             url=url,
             media_type=media_type,
             pickle=pickle,
@@ -355,7 +355,7 @@ class Bin:
         self,
         container: str,
         storage_service: Literal["azure", "aws", "gcp"],
-        key: str,
+        name: str,
         file_path: str,
         media_type: Optional[MediaType] = None,
         pickle: bool = False,
@@ -363,7 +363,7 @@ class Bin:
         self.checkins[-1].upload_file(
             container=container,
             storage_service=storage_service,
-            key=key,
+            name=name,
             file_path=file_path,
             media_type=media_type,
             pickle=pickle,
@@ -373,13 +373,13 @@ class Bin:
         self,
         container: str,
         storage_service: Literal["azure", "aws", "gcp"],
-        key: str,
+        name: str,
         variable: Any,
     ):
         self.checkins[-1].upload_pickle(
             container=container,
             storage_service=storage_service,
-            key=key,
+            name=name,
             variable=variable,
         )
 
@@ -387,7 +387,7 @@ class Bin:
         self,
         container: str,
         storage_service: Literal["azure", "aws", "gcp"],
-        key: str,
+        name: str,
         array: numpy.ndarray | torch.Tensor,
         range: Tuple[int, int] = (0, 255),
         colorspace: Optional[
@@ -409,7 +409,7 @@ class Bin:
         self.checkins[-1].upload_array_as_image(
             container=container,
             storage_service=storage_service,
-            key=key,
+            name=name,
             array=array,
             range=range,
             colorspace=colorspace,
