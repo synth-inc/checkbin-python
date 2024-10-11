@@ -139,6 +139,30 @@ class Checkin:
         self.state = None
         self.files = None
 
+    @classmethod
+    def from_dict(cls, file_uploader: FileUploader, name: str, data: dict[str, Any]):
+        checkin = cls(file_uploader, name)
+        for key, value in data.items():
+            if isinstance(value, str) and value.startswith("http"):
+                basename = os.path.basename(value)
+                _, extension = os.path.splitext(basename)
+                extension = extension.lower()
+
+                image_extensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
+                video_extensions = {".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm"}
+
+                media_type = None
+                if extension in image_extensions:
+                    media_type = "image"
+                elif extension in video_extensions:
+                    media_type = "video"
+
+                # Add file with determined media type
+                checkin.add_file(key, value, media_type)
+            else:
+                checkin.add_state(key, value)
+        return checkin
+
     def to_dict(self):
         return {
             "name": self.name,
@@ -391,7 +415,37 @@ class InputSet:
         self.checkins.append(checkin)
         return checkin
 
+    def create_from_json(
+        self,
+        json_data: Optional[list[dict[str, Any]]] = None,
+        json_file: Optional[str] = None,
+    ):
+        json_dict = json_data
+
+        if json_file is not None:
+            with open(json_file, "r") as file:
+                json_dict = json.load(file)
+
+        if json_dict is None:
+            raise Exception("Either json_data or json_file must be provided")
+
+        if not isinstance(json_dict, list):
+            raise Exception("JSON must be a list")
+
+        for item in json_dict:
+            if not isinstance(item, dict):
+                raise Exception("Each element in the JSON list must be a dictionary")
+
+        self.checkins = [
+            Checkin.from_dict(self.file_uploader, "Input", data) for data in json_dict
+        ]
+
+        return self.submit()
+
     def submit(self):
+        if self.set_id is not None:
+            raise Exception("Set already submitted")
+
         set_response = requests.post(
             f"{self.base_url}/set",
             headers=get_headers(),
