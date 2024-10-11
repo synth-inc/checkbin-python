@@ -43,10 +43,8 @@ def handle_http_error(response: requests.Response):
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
         content = json.loads(response.content)
-        print(
-            f"Checkbin API Error: status {response.status_code}, message: {content['message']}"
-        )
-        raise e
+        message = f"Checkbin API Error: status {response.status_code}, message: {content['message']}"
+        raise Exception(message) from e
 
 
 class FileUploader:
