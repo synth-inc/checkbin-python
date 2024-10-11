@@ -38,6 +38,17 @@ def get_headers():
     return {}
 
 
+def handle_http_error(response: requests.Response):
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        content = json.loads(response.content)
+        print(
+            f"Checkbin API Error: status {response.status_code}, message: {content['message']}"
+        )
+        raise e
+
+
 class FileUploader:
     def __init__(self):
         self.azure_account_name = None
@@ -332,7 +343,7 @@ class Bin:
                 json={"status": "running"},
                 timeout=30,
             )
-            test_response.raise_for_status()
+            handle_http_error(test_response)
             self.is_running = True
 
     def add_state(self, name: str, state: Any):
@@ -431,7 +442,7 @@ class Bin:
             },
             timeout=30,
         )
-        create_response.raise_for_status()
+        handle_http_error(create_response)
 
         test_response = requests.patch(
             f"{self.base_url}/test/{self.test_id}",
@@ -439,7 +450,7 @@ class Bin:
             json={"status": "completed"},
             timeout=30,
         )
-        test_response.raise_for_status()
+        handle_http_error(test_response)
 
 
 class InputSet:
@@ -474,7 +485,7 @@ class InputSet:
             },
             timeout=30,
         )
-        set_response.raise_for_status()
+        handle_http_error(set_response)
         set_data = json.loads(set_response.content)
         self.set_id = set_data["id"]
         return self.set_id
@@ -535,7 +546,7 @@ class App:
             json={"appKey": self.app_key},
             timeout=30,
         )
-        run_response.raise_for_status()
+        handle_http_error(run_response)
         run_data = json.loads(run_response.content)
         run_id = run_data["id"]
 
@@ -547,7 +558,7 @@ class App:
                 params={"includeState": "true"},
                 timeout=30,
             )
-            checkin_response.raise_for_status()
+            handle_http_error(checkin_response)
             checkin = json.loads(checkin_response.content)
             checkins = [checkin]
         elif set_id is not None:
@@ -557,7 +568,7 @@ class App:
                 params={"includeCheckins": "true", "includeState": "true"},
                 timeout=30,
             )
-            set_response.raise_for_status()
+            handle_http_error(set_response)
             set = json.loads(set_response.content)
             checkins = set["checkins"]
             if sample_size is not None:
@@ -583,7 +594,7 @@ class App:
             },
             timeout=30,
         )
-        tests_response.raise_for_status()
+        handle_http_error(tests_response)
         tests = json.loads(tests_response.content)
 
         print(f"Checkbin: started run {run_id} with {len(tests)} tests")
