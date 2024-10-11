@@ -139,7 +139,7 @@ class Checkin:
         self.state = None
         self.files = None
 
-    def get_state(self):
+    def to_dict(self):
         return {
             "name": self.name,
             "state": self.state,
@@ -349,7 +349,7 @@ class Bin(with_typehint(Checkin)):
             json={
                 "runId": self.run_id,
                 "parentId": self.parent_id,
-                "checkins": [checkin.get_state() for checkin in self.checkins],
+                "checkins": [checkin.to_dict() for checkin in self.checkins],
             },
             timeout=30,
         )
@@ -399,7 +399,7 @@ class InputSet:
                 "appKey": self.app_key,
                 "name": self.name,
                 "isInput": True,
-                "checkins": [checkin.get_state() for checkin in self.checkins],
+                "checkins": [checkin.to_dict() for checkin in self.checkins],
             },
             timeout=30,
         )
