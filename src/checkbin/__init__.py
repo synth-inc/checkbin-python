@@ -340,87 +340,6 @@ class Bin:
             handle_http_error(test_response)
             self.is_running = True
 
-    def add_state(self, name: str, state: Any):
-        self.checkins[-1].add_state(name=name, state=state)
-
-    def add_file(
-        self,
-        name: str,
-        url: str,
-        media_type: Optional[MediaType] = None,
-        pickle: bool = False,
-    ):
-        self.checkins[-1].add_file(
-            name=name,
-            url=url,
-            media_type=media_type,
-            pickle=pickle,
-        )
-
-    def upload_file(
-        self,
-        container: str,
-        storage_service: Literal["azure", "aws", "gcp"],
-        name: str,
-        file_path: str,
-        media_type: Optional[MediaType] = None,
-        pickle: bool = False,
-    ):
-        self.checkins[-1].upload_file(
-            container=container,
-            storage_service=storage_service,
-            name=name,
-            file_path=file_path,
-            media_type=media_type,
-            pickle=pickle,
-        )
-
-    def upload_pickle(
-        self,
-        container: str,
-        storage_service: Literal["azure", "aws", "gcp"],
-        name: str,
-        variable: Any,
-    ):
-        self.checkins[-1].upload_pickle(
-            container=container,
-            storage_service=storage_service,
-            name=name,
-            variable=variable,
-        )
-
-    def upload_array_as_image(
-        self,
-        container: str,
-        storage_service: Literal["azure", "aws", "gcp"],
-        name: str,
-        array: numpy.ndarray | torch.Tensor,
-        range: Tuple[int, int] = (0, 255),
-        colorspace: Optional[
-            Literal[
-                "BGR",
-                "BGRA",
-                "RGBA",
-                "RGB",
-                "GRAY",
-                "YCrCb",
-                "HSV",
-                "Lab",
-                "Luv",
-                "HLS",
-                "YUV",
-            ]
-        ] = None,
-    ):
-        self.checkins[-1].upload_array_as_image(
-            container=container,
-            storage_service=storage_service,
-            name=name,
-            array=array,
-            range=range,
-            colorspace=colorspace,
-        )
-
     def submit(self):
         create_response = requests.post(
             f"{self.base_url}/checkin",
@@ -441,6 +360,13 @@ class Bin:
             timeout=30,
         )
         handle_http_error(test_response)
+
+    def __getattr__(self, name):
+        if len(self.checkins) == 0:
+            raise AttributeError(
+                f"'Bin' object has no attribute '{name}'. Create at least one checkin."
+            )
+        return getattr(self.checkins[-1], name)
 
 
 class InputSet:
