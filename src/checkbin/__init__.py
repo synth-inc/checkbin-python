@@ -135,7 +135,7 @@ class Checkin:
     ):
         self.file_uploader = file_uploader
         self.name = name
-        self.names = set()
+        self.state_names = set()
         self.state = None
         self.files = None
 
@@ -146,23 +146,23 @@ class Checkin:
             "files": self.files,
         }
 
-    def __get_name(self, name: str) -> str:
-        if name not in self.names:
-            return name
+    def __get_state_name(self, state_name: str) -> str:
+        if state_name not in self.state_names:
+            return state_name
 
         level = 1
-        new_name = name
-        while new_name in self.names:
-            new_name = f"{name}_{level}"
+        new_state_name = state_name
+        while new_state_name in self.state_names:
+            new_state_name = f"{state_name}_{level}"
             level += 1
-        return new_name
+        return new_state_name
 
     def add_state(self, name: str, state: Any):
         if self.state is None:
             self.state = {}
-        name = self.__get_name(name)
+        name = self.__get_state_name(name)
         self.state[name] = state
-        self.names.add(name)
+        self.state_names.add(name)
 
     def add_file(
         self,
@@ -173,13 +173,13 @@ class Checkin:
     ):
         if self.files is None:
             self.files = {}
-        name = self.__get_name(name)
+        name = self.__get_state_name(name)
         self.files[name] = {
             "url": url,
             "mediaType": media_type,
             "pickle": pickle,
         }
-        self.names.add(name)
+        self.state_names.add(name)
 
     def upload_file(
         self,
