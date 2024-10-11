@@ -20,6 +20,8 @@ import boto3
 from google.cloud import storage
 from azure.storage.blob import BlobServiceClient
 
+from .utils import with_typehint
+
 
 MediaType = Literal["image", "video"]
 
@@ -286,7 +288,7 @@ class Checkin:
             self.upload_file(container, storage_service, name, tmp_file.name, "image")
 
 
-class Bin:
+class Bin(with_typehint(Checkin)):
     def __init__(
         self,
         test_id: str,
