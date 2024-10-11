@@ -422,10 +422,6 @@ class Bin:
         )
 
     def submit(self):
-        self.checkin("Output")
-        self.checkins[-1].state = self.checkins[-2].state
-        self.checkins[-1].files = self.checkins[-2].files
-
         create_response = requests.post(
             f"{self.base_url}/checkin",
             headers=get_headers(),
