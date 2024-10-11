@@ -23,7 +23,6 @@ class CheckinFile(BaseModel):
 
 class Checkin(BaseModel):
     name: Optional[str] = None
-    ids: Optional[dict[str, str | float | int]] = None
     state: Optional[dict] = None
     files: Optional[dict[str, CheckinFile]] = None
 
@@ -41,7 +40,6 @@ def create_checkin(
         "runId": run_id,
         "parentId": parent_id,
         "name": checkin.name,
-        "ids": checkin.ids,
         "isOutput": is_output,
         "createdAt": datetime.now().isoformat(),
         "updatedAt": datetime.now().isoformat(),

@@ -130,11 +130,9 @@ class Checkin:
         self,
         file_uploader: FileUploader,
         name: str,
-        ids: Optional[dict[str, str | int | float]] = None,
     ):
         self.file_uploader = file_uploader
         self.name = name
-        self.ids = ids
         self.names = set()
         self.state = None
         self.files = None
@@ -142,7 +140,6 @@ class Checkin:
     def get_state(self):
         return {
             "name": self.name,
-            "ids": self.ids,
             "state": self.state,
             "files": self.files,
         }
@@ -330,9 +327,8 @@ class Bin:
     def checkin(
         self,
         name: str,
-        ids: Optional[dict[str, str | int | float]] = None,
     ):
-        self.checkins.append(Checkin(self.file_uploader, name, ids))
+        self.checkins.append(Checkin(self.file_uploader, name))
 
         if not self.is_running:
             test_response = requests.patch(
