@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 import os
+import csv
 import time
 import uuid
 import json
@@ -439,6 +440,17 @@ class InputSet:
         self.checkins = [
             Checkin.from_dict(self.file_uploader, "Input", data) for data in json_dict
         ]
+
+        return self.submit()
+
+    def create_from_csv(self, csv_file: str):
+        with open(csv_file, "r") as file:
+            csv_reader = csv.DictReader(file)
+
+            self.checkins = [
+                Checkin.from_dict(self.file_uploader, "Input", row)
+                for row in csv_reader
+            ]
 
         return self.submit()
 
