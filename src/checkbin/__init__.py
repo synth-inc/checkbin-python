@@ -20,12 +20,14 @@ import requests
 import boto3
 from google.cloud import storage
 from azure.storage.blob import BlobServiceClient
+from azure.storage.filedatalake import DataLakeServiceClient
 
 from .utils import with_typehint
 
 
 MediaType = Literal["image", "video"]
 
+CHECKBIN_REMOTE_URL = "https://checkbin-server-prod-d332d31d3c50.herokuapp.com"
 
 AUTH_TOKEN = None
 
@@ -51,7 +53,9 @@ def handle_http_error(response: requests.Response):
 
 
 class FileUploader:
-    def __init__(self):
+    def __init__(self, app_key: str, mode: Literal["local", "remote"]):
+        self.app_key = app_key
+        self.mode = mode
         self.azure_account_name = None
         self.azure_account_key = None
         self.aws_access_key = None
@@ -73,7 +77,9 @@ class FileUploader:
     def add_gcp_credentials_json(self, service_account_json: str):
         self.gcp_service_account_json = service_account_json
 
-    def check_credentials(self, storage_service: Literal["azure", "aws", "gcp"]):
+    def check_credentials(
+        self, storage_service: Optional[Literal["azure", "aws", "gcp"]] = None
+    ):
         if storage_service == "azure":
             if self.azure_account_name is None:
                 raise Exception("Azure account name is required")
@@ -91,13 +97,46 @@ class FileUploader:
             ):
                 raise Exception("GCP service account info or json is required")
 
+    def generate_filename(self, extension: str):
+        return f"{uuid.uuid4()}{extension}"
+
+    def upload_file_checkbin(
+        self, extension: str, file: bytes, run_id: Optional[str] = None
+    ):
+        if self.mode == "local":
+            raise Exception("Checkbin file hosting is not available in local mode")
+
+        filename = self.generate_filename(extension)
+        file_response = requests.post(
+            f"{CHECKBIN_REMOTE_URL}/file",
+            headers=get_headers(),
+            json={
+                "appKey": self.app_key,
+                "filename": filename,
+                "runId": run_id,
+            },
+            timeout=30,
+        )
+        handle_http_error(file_response)
+        file_data = json.loads(file_response.content)
+        sas_token = file_data["sasToken"]
+        file_path = file_data["path"]
+
+        service_client = DataLakeServiceClient(
+            "https://checkbin.dfs.core.windows.net", credential=sas_token
+        )
+        file_system_client = service_client.get_file_system_client("user-storage")
+        file_client = file_system_client.get_file_client(file_path)
+        file_client.upload_data(file)
+        return file_client.url
+
     def upload_file_azure(self, container: str, extension: str, file: bytes):
         blob_service_client = BlobServiceClient(
             account_url=f"https://{self.azure_account_name}.blob.core.windows.net",
             credential=self.azure_account_key,
         )
         container_client = blob_service_client.get_container_client(container)
-        filename = f"{uuid.uuid4().hex}{extension}"
+        filename = self.generate_filename(extension)
         blob_client = container_client.get_blob_client(filename)
         blob_client.upload_blob(file)
         return blob_client.url
@@ -108,7 +147,7 @@ class FileUploader:
             aws_access_key_id=self.aws_access_key,
             aws_secret_access_key=self.aws_secret_key,
         )
-        filename = f"{uuid.uuid4().hex}{extension}"
+        filename = self.generate_filename(extension)
         s3_client.upload_fileobj(file, bucket, filename)
         return f"https://{bucket}.s3.amazonaws.com/{filename}"
 
@@ -122,7 +161,7 @@ class FileUploader:
                 self.gcp_service_account_json
             )
         bucket_client = storage_client.get_bucket(bucket)
-        filename = f"{uuid.uuid4().hex}{extension}"
+        filename = self.generate_filename(extension)
         blob_client = bucket_client.blob(filename)
         blob_client.upload_from_file(file)
         return f"https://storage.googleapis.com/{bucket}/{filename}"
@@ -133,12 +172,14 @@ class Checkin:
         self,
         file_uploader: FileUploader,
         name: str,
+        run_id: Optional[str] = None,
     ):
         self.file_uploader = file_uploader
         self.name = name
         self.state_names = set()
         self.state = None
         self.files = None
+        self.run_id = run_id
 
     @classmethod
     def from_dict(cls, file_uploader: FileUploader, name: str, data: dict[str, Any]):
@@ -208,12 +249,12 @@ class Checkin:
 
     def upload_file(
         self,
-        container: str,
-        storage_service: Literal["azure", "aws", "gcp"],
         name: str,
         file_path: str,
         media_type: Optional[MediaType] = None,
         pickle: bool = False,
+        container: Optional[str] = None,
+        storage_service: Optional[Literal["azure", "aws", "gcp"]] = None,
     ):
         self.file_uploader.check_credentials(storage_service)
 
@@ -227,6 +268,10 @@ class Checkin:
                 url = self.file_uploader.upload_file_aws(container, extension, file)
             elif storage_service == "gcp":
                 url = self.file_uploader.upload_file_gcp(container, extension, file)
+            else:
+                url = self.file_uploader.upload_file_checkbin(
+                    extension, file, self.run_id
+                )
             print(f"Checkbin: recording file upload time: {time.time() - start_time}")
             print(f"Checkbin: recorded file: {url}")
 
@@ -234,17 +279,21 @@ class Checkin:
 
     def upload_pickle(
         self,
-        container: str,
-        storage_service: Literal["azure", "aws", "gcp"],
         name: str,
         variable: Any,
+        container: Optional[str] = None,
+        storage_service: Optional[Literal["azure", "aws", "gcp"]] = None,
     ):
         self.file_uploader.check_credentials(storage_service)
 
         with tempfile.NamedTemporaryFile(suffix=".pkl") as tmp_file:
             pickle.dump(variable, tmp_file)
             self.upload_file(
-                container, storage_service, name, tmp_file.name, pickle=True
+                name=name,
+                file_path=tmp_file.name,
+                pickle=True,
+                container=container,
+                storage_service=storage_service,
             )
 
     def __colorspace_to_conversion(self, colorspace: str) -> Optional[int]:
@@ -273,8 +322,6 @@ class Checkin:
 
     def upload_array_as_image(
         self,
-        container: str,
-        storage_service: Literal["azure", "aws", "gcp"],
         name: str,
         array: numpy.ndarray | torch.Tensor,
         range: Tuple[int, int] = (0, 255),
@@ -293,6 +340,8 @@ class Checkin:
                 "YUV",
             ]
         ] = None,
+        container: Optional[str] = None,
+        storage_service: Optional[Literal["azure", "aws", "gcp"]] = None,
     ):
         self.file_uploader.check_credentials(storage_service)
 
@@ -310,7 +359,13 @@ class Checkin:
 
         with tempfile.NamedTemporaryFile(suffix=".jpg") as tmp_file:
             cv2.imwrite(tmp_file.name, array)
-            self.upload_file(container, storage_service, name, tmp_file.name, "image")
+            self.upload_file(
+                name=name,
+                file_path=tmp_file.name,
+                media_type="image",
+                container=container,
+                storage_service=storage_service,
+            )
 
 
 class Bin(with_typehint(Checkin)):
@@ -355,7 +410,7 @@ class Bin(with_typehint(Checkin)):
         self,
         name: str,
     ):
-        self.checkins.append(Checkin(self.file_uploader, name))
+        self.checkins.append(Checkin(self.file_uploader, name, self.run_id))
 
         if not self.is_running:
             test_response = requests.patch(
@@ -486,8 +541,8 @@ class App:
         if mode == "local":
             self.base_url = f"http://localhost:{port}"
         else:
-            self.base_url = "https://checkbin-server-prod-d332d31d3c50.herokuapp.com"
-        self.file_uploader = FileUploader()
+            self.base_url = CHECKBIN_REMOTE_URL
+        self.file_uploader = FileUploader(app_key=app_key, mode=mode)
 
     def add_azure_credentials(self, account_name: str, account_key: str):
         self.file_uploader.add_azure_credentials(
