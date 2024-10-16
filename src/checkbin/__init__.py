@@ -127,7 +127,8 @@ class FileUploader:
         )
         file_system_client = service_client.get_file_system_client("user-storage")
         file_client = file_system_client.get_file_client(file_path)
-        file_client.upload_data(file)
+        file_client.create_file()
+        file_client.upload_data(file, overwrite=True)
         return file_client.url
 
     def upload_file_azure(self, container: str, extension: str, file: bytes):
