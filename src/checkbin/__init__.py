@@ -101,7 +101,7 @@ class FileUploader:
         return f"{uuid.uuid4()}{extension}"
 
     def upload_file_checkbin(
-        self, extension: str, file: bytes, run_id: Optional[str] = None
+        self, extension: str, file: bytes, size: int, run_id: Optional[str] = None
     ):
         if self.mode == "local":
             raise Exception("Checkbin file hosting is not available in local mode")
@@ -113,7 +113,7 @@ class FileUploader:
             json={
                 "appKey": self.app_key,
                 "filename": filename,
-                "size": len(file),
+                "size": size,
                 "runId": run_id,
             },
             timeout=30,
@@ -271,8 +271,11 @@ class Checkin:
             elif storage_service == "gcp":
                 url = self.file_uploader.upload_file_gcp(container, extension, file)
             else:
+                file.seek(0, os.SEEK_END)
+                size = file.tell()
+                file.seek(0)
                 url = self.file_uploader.upload_file_checkbin(
-                    extension, file, self.run_id
+                    extension, file, size, self.run_id
                 )
             print(f"Checkbin: recording file upload time: {time.time() - start_time}")
             print(f"Checkbin: recorded file: {url}")
