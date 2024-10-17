@@ -11,6 +11,7 @@ import copy
 import random
 import pickle
 import tempfile
+from io import BufferedReader
 from typing import Optional, Any, Tuple, Literal
 
 import cv2
@@ -101,12 +102,20 @@ class FileUploader:
         return f"{uuid.uuid4()}{extension}"
 
     def upload_file_checkbin(
-        self, extension: str, file: bytes, size: int, run_id: Optional[str] = None
+        self,
+        extension: str,
+        file: BufferedReader,
+        run_id: Optional[str] = None,
     ):
         if self.mode == "local":
             raise Exception("Checkbin file hosting is not available in local mode")
 
         filename = self.generate_filename(extension)
+
+        file.seek(0, os.SEEK_END)
+        size = file.tell()
+        file.seek(0)
+
         file_response = requests.post(
             f"{CHECKBIN_REMOTE_URL}/file",
             headers=get_headers(),
@@ -132,7 +141,7 @@ class FileUploader:
         file_client.upload_data(file, overwrite=True)
         return f"https://checkbin.dfs.core.windows.net/user-storage/{file_path}"
 
-    def upload_file_azure(self, container: str, extension: str, file: bytes):
+    def upload_file_azure(self, container: str, extension: str, file: BufferedReader):
         blob_service_client = BlobServiceClient(
             account_url=f"https://{self.azure_account_name}.blob.core.windows.net",
             credential=self.azure_account_key,
@@ -143,7 +152,7 @@ class FileUploader:
         blob_client.upload_blob(file)
         return blob_client.url
 
-    def upload_file_aws(self, bucket: str, extension: str, file: bytes):
+    def upload_file_aws(self, bucket: str, extension: str, file: BufferedReader):
         s3_client = boto3.client(
             "s3",
             aws_access_key_id=self.aws_access_key,
@@ -153,7 +162,7 @@ class FileUploader:
         s3_client.upload_fileobj(file, bucket, filename)
         return f"https://{bucket}.s3.amazonaws.com/{filename}"
 
-    def upload_file_gcp(self, bucket: str, extension: str, file: bytes):
+    def upload_file_gcp(self, bucket: str, extension: str, file: BufferedReader):
         if self.gcp_service_account_info is not None:
             storage_client = storage.Client.from_service_account_info(
                 self.gcp_service_account_info
@@ -271,11 +280,8 @@ class Checkin:
             elif storage_service == "gcp":
                 url = self.file_uploader.upload_file_gcp(container, extension, file)
             else:
-                file.seek(0, os.SEEK_END)
-                size = file.tell()
-                file.seek(0)
                 url = self.file_uploader.upload_file_checkbin(
-                    extension, file, size, self.run_id
+                    extension, file, self.run_id
                 )
             print(f"Checkbin: recording file upload time: {time.time() - start_time}")
             print(f"Checkbin: recorded file: {url}")
