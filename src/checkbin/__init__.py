@@ -113,6 +113,7 @@ class FileUploader:
             json={
                 "appKey": self.app_key,
                 "filename": filename,
+                "size": len(file),
                 "runId": run_id,
             },
             timeout=30,
