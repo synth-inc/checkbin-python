@@ -137,7 +137,6 @@ class FileUploader:
         )
         file_system_client = service_client.get_file_system_client("user-storage")
         file_client = file_system_client.get_file_client(file_path)
-        file_client.create_file()
         file_client.upload_data(file, overwrite=True)
         return f"https://checkbin.dfs.core.windows.net/user-storage/{file_path}"
 
