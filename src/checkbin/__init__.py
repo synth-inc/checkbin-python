@@ -28,7 +28,7 @@ from .utils import with_typehint
 
 MediaType = Literal["image", "video"]
 
-CHECKBIN_REMOTE_URL = "https://checkbin-server-prod-d332d31d3c50.herokuapp.com"
+CHECKBIN_REMOTE_URL = "https://api.checkbin.dev"
 
 AUTH_TOKEN = None
 
